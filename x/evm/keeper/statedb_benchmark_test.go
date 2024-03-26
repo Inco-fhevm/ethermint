@@ -180,7 +180,7 @@ func BenchmarkAddRefund(b *testing.B) {
 	}
 }
 
-func BenchmarkSuicide(b *testing.B) {
+func BenchmarkSelfDestruct(b *testing.B) {
 	suite := StatedbBenchmarkTestSuite{}
 	suite.SetupTest(b)
 	vmdb := suite.StateDB()
