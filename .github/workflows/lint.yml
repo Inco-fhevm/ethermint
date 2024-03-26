@@ -9,7 +9,6 @@ on:
       - develop
 jobs:
   golangci:
-    if: false
     name: Run golangci-lint
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -35,7 +34,6 @@ jobs:
         # Check only if there are differences in the source code
         if: env.GIT_DIFF
   markdown-lint:
-    if: false
     name: Run markdown-lint
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -55,7 +53,6 @@ jobs:
         # Check only if there are differences in the source code
         if: env.GIT_DIFF
   python-lint:
-    if: false
     name: Run flake8 on python integration tests
     runs-on: ubuntu-latest
     steps:
@@ -72,7 +69,6 @@ jobs:
           nix-shell -I nixpkgs=./nix -p test-env --run "make lint-py"
         if: env.GIT_DIFF
   gomod2nix:
-    if: false
     name: Check gomod2nix.toml file is up to date
     runs-on: ubuntu-latest
     steps:
