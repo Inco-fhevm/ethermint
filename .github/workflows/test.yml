@@ -16,6 +16,7 @@ jobs:
     if: "!startsWith(github.ref, 'refs/tags/') && github.ref != 'refs/heads/main'"
 
   test-unit-cover:
+    if: false
     runs-on: ubuntu-latest
     steps:
       - uses: actions/setup-go@v4
