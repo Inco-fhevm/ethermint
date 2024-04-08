@@ -145,8 +145,15 @@ func (am AppModule) RegisterServices(cfg module.Configurator) {
 	types.RegisterMsgServer(cfg.MsgServer(), am.keeper)
 	types.RegisterQueryServer(cfg.QueryServer(), am.keeper)
 
+	// Run RPC server that talks to the SGX binary.
+	fmt.Printf("RegisterServices K address=%p\n", am.keeper)
+	err := am.keeper.RunRPCServer()
+	if err != nil {
+		panic(err)
+	}
+
 	m := keeper.NewMigrator(*am.keeper, am.legacySubspace)
-	err := cfg.RegisterMigration(types.ModuleName, 3, m.Migrate3to4)
+	err = cfg.RegisterMigration(types.ModuleName, 3, m.Migrate3to4)
 	if err != nil {
 		panic(err)
 	}

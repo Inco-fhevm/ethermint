@@ -19,9 +19,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/big"
-	"net"
-	"net/http"
-	"net/rpc"
 
 	cmttypes "github.com/cometbft/cometbft/types"
 
@@ -317,6 +314,7 @@ func (k *Keeper) ApplyMessageWithConfig(
 	if err != nil {
 		return nil, errorsmod.Wrap(err, "failed to create new RPC server")
 	}
+	fmt.Println("BBB", k.sdkCtx)
 
 	leftoverGas := msg.GasLimit
 	sender := vm.AccountRef(msg.From)
@@ -453,24 +451,15 @@ func (k *Keeper) ApplyMessageWithConfig(
 	}, nil
 }
 
-// prepareTxForSgx prepares the transaction for the SGX enclave. It:
-//   - creates an RPC server around the keeper to receive requests sent by the
-//     SGX
-//   - sends a "PrepareTx" request to the SGX enclave with the relevant tx and
-//     block info
+// prepareTxForSgx prepares the transaction for the SGX enclave.
 func (k *Keeper) prepareTxForSgx(ctx sdk.Context, msg core.Message, cfg *EVMConfig, sgxRpcClient *sgxRpcClient) error {
-	// Step 1. Create an RPC server to receive requests from the SGX enclave.
-	err := k.runRPCServer(ctx, msg, cfg)
-	if err != nil {
-		return err
-	}
+	k.sdkCtx = ctx
+	fmt.Printf("prepareTxForSgx setting k.sdkCtx %p\n", k)
 
-	// Step 2. Send a "PrepareTx" request to the SGX enclave.
 	chainConfigJson, err := json.Marshal(cfg.ChainConfig)
 	if err != nil {
 		return err
 	}
-	ctx.HeaderHash()
 	args := PrepareTxArgs{
 		Header: ctx.BlockHeader(),
 		Msg:    msg,
@@ -486,31 +475,4 @@ func (k *Keeper) prepareTxForSgx(ctx sdk.Context, msg core.Message, cfg *EVMConf
 	}
 
 	return sgxRpcClient.PrepareTx(args, &PrepareTxReply{})
-}
-
-func (k *Keeper) runRPCServer(ctx sdk.Context, msg core.Message, cfg *EVMConfig) error {
-	defer func() {
-		if r := recover(); r != nil {
-			ctx.Logger().Debug("recovered from panic", "error", r)
-		}
-	}()
-
-	// TODO Think about whether the RPC server should be persistent or ephemeral
-	//  - If it's persistent, we need to handle the lifecycle of the RPC server
-	//  - If it's ephemeral, we need to create a new RPC server for each message
-	//  The current implementation is ephemeral.
-	srv := &EthmRpcServer{k: k, ctx: ctx, msg: msg, evmCfg: cfg}
-	rpc.Register(srv)
-	rpc.HandleHTTP()
-
-	// TODO handle port customization
-	l, err := net.Listen("tcp", ":9093")
-	if err != nil {
-		// TODO handle error
-		panic(err)
-	}
-	// TODO Handle shutdown
-	go http.Serve(l, nil)
-
-	return nil
 }

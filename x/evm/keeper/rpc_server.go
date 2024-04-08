@@ -1,72 +1,98 @@
 package keeper
 
 import (
+	"fmt"
 	"math/big"
+	"net"
+	"net/http"
+	"net/rpc"
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core"
 	"github.com/evmos/ethermint/x/evm/statedb"
 )
+
+func (k *Keeper) RunRPCServer() error {
+	srv := EthmRpcServer{k: k}
+	err := rpc.Register(&srv)
+	if err != nil {
+		// The emv module's RegisterServices is unfortunately called twice:
+		// - once on app startup
+		// - another time for autocli discovery
+		// Calling twice will cause a panic on rpc.Register, that's why we
+		// ignore the error, and return early.
+		return nil
+	}
+	rpc.HandleHTTP()
+
+	// TODO handle port customization
+	l, err := net.Listen("tcp", ":9093")
+	if err != nil {
+		return err
+	}
+	// TODO Handle shutdown
+	go http.Serve(l, nil)
+
+	return nil
+}
 
 // EthmRpcServer is a RPC server wrapper around the keeper. It is updated on
 // each new sdk.Message with the latest context and Ethereum core.Message.
 type EthmRpcServer struct {
-	ctx    sdk.Context
-	msg    core.Message
-	evmCfg *EVMConfig
-	k      *Keeper
+	k *Keeper
 }
 
 func (s *EthmRpcServer) GetHash(height *uint64, hash *common.Hash) error {
-	*hash = s.k.GetHashFn(s.ctx)(*height)
+	*hash = s.k.GetHashFn(s.k.sdkCtx)(*height)
 	return nil
 }
 
 func (s *EthmRpcServer) AddBalance(args *AddBalanceArgs, reply *AddBalanceReply) error {
-	return s.k.AddBalance(s.ctx, args.Addr, args.Amount)
+	return s.k.AddBalance(s.k.sdkCtx, args.Addr, args.Amount)
 }
 
 func (s *EthmRpcServer) SubBalance(args *SubBalanceArgs, reply *SubBalanceReply) error {
-	return s.k.SubBalance(s.ctx, args.Addr, args.Amount)
+	return s.k.SubBalance(s.k.sdkCtx, args.Addr, args.Amount)
 }
 
 func (s *EthmRpcServer) GetBalance(args *GetBalanceArgs, reply *GetBalanceReply) error {
-	reply.Balance = s.k.GetBalance(s.ctx, args.Addr, args.Denom)
+	reply.Balance = s.k.GetBalance(s.k.sdkCtx, args.Addr, args.Denom)
 	return nil
 }
 
 func (s *EthmRpcServer) GetAccount(args *GetAccountArgs, reply *GetAccountReply) error {
-	reply.Account = s.k.GetAccount(s.ctx, args.Addr)
+	fmt.Println("AAA", s.k.sdkCtx)
+	fmt.Printf("GetAccount K address=%p\n", s.k)
+	reply.Account = s.k.GetAccount(s.k.sdkCtx, args.Addr)
 	return nil
 }
 
 func (s *EthmRpcServer) GetState(args *GetStateArgs, reply *GetStateReply) error {
-	reply.Hash = s.k.GetState(s.ctx, args.Addr, args.Key)
+	reply.Hash = s.k.GetState(s.k.sdkCtx, args.Addr, args.Key)
 	return nil
 }
 
 func (s *EthmRpcServer) GetCode(args *GetCodeArgs, reply *GetCodeReply) error {
-	reply.Code = s.k.GetCode(s.ctx, args.CodeHash)
+	reply.Code = s.k.GetCode(s.k.sdkCtx, args.CodeHash)
 	return nil
 }
 
 func (s *EthmRpcServer) SetAccount(args *SetAccountArgs, reply *SetAccountReply) error {
-	return s.k.SetAccount(s.ctx, args.Addr, args.Account)
+	return s.k.SetAccount(s.k.sdkCtx, args.Addr, args.Account)
 }
 
 func (s *EthmRpcServer) SetState(args *SetStateArgs, reply *SetStateReply) error {
-	s.k.SetState(s.ctx, args.Addr, args.Key, args.Value)
+	s.k.SetState(s.k.sdkCtx, args.Addr, args.Key, args.Value)
 	return nil
 }
 
 func (s *EthmRpcServer) SetCode(args *SetCodeArgs, reply *SetCodeReply) error {
-	s.k.SetCode(s.ctx, args.CodeHash, args.Code)
+	s.k.SetCode(s.k.sdkCtx, args.CodeHash, args.Code)
 	return nil
 }
 
 func (s *EthmRpcServer) DeleteAccount(args *DeleteAccountArgs, reply *DeleteAccountReply) error {
-	return s.k.DeleteAccount(s.ctx, args.Addr)
+	return s.k.DeleteAccount(s.k.sdkCtx, args.Addr)
 }
 
 // AddBalanceArgs is the argument struct for the statedb.Keeper#AddBalance method.
