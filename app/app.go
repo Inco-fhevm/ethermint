@@ -159,6 +159,8 @@ func init() {
 
 const appName = "ethermintd"
 
+var kCount = 0
+
 var (
 	// DefaultNodeHome default home directories for the application daemon
 	DefaultNodeHome string
@@ -515,6 +517,8 @@ func NewEthermintApp(
 		nil,
 		allKeys,
 	)
+	fmt.Printf("CREATING keeper %d: %p\n", kCount, app.EvmKeeper)
+	kCount++
 
 	// register the proposal types
 	govRouter := govv1beta1.NewRouter()

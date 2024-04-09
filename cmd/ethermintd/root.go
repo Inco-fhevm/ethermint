@@ -17,6 +17,7 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"os"
 
@@ -70,6 +71,7 @@ func (ao emptyAppOptions) Get(_ string) interface{} { return nil }
 // NewRootCmd creates a new root command for simd. It is called once in the
 // main function.
 func NewRootCmd() (*cobra.Command, ethermint.EncodingConfig) {
+	fmt.Println("TEMP APP")
 	tempApp := app.NewEthermintApp(cmtlog.NewNopLogger(), dbm.NewMemDB(), nil, true, emptyAppOptions{})
 	encodingConfig := app.MakeConfigForTest()
 	initClientCtx := client.Context{}.

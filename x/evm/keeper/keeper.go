@@ -78,6 +78,11 @@ type Keeper struct {
 	// a set of store keys that should cover all the precompile use cases,
 	// or ideally just pass the application's all stores.
 	keys map[string]storetypes.StoreKey
+
+	// sdkCtx is the sdk.Context passed in from BaseApp. We store it here so we
+	// can use it for the RPC server. It shouldn't be used for any other
+	// purposes, unless you know what you're doing.
+	sdkCtx sdk.Context
 }
 
 // NewKeeper generates new evm module keeper
