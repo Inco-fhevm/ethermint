@@ -82,7 +82,7 @@ type Keeper struct {
 	// sdkCtx is the sdk.Context passed in from BaseApp. We store it here so we
 	// can use it for the RPC server. It shouldn't be used for any other
 	// purposes, unless you know what you're doing.
-	sdkCtx sdk.Context
+	stateDB *statedb.StateDB
 }
 
 // NewKeeper generates new evm module keeper

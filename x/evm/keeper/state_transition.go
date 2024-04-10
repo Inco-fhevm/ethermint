@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"math/big"
 
+	cmtproto "github.com/cometbft/cometbft/proto/tendermint/types"
 	cmttypes "github.com/cometbft/cometbft/types"
 
 	errorsmod "cosmossdk.io/errors"
@@ -310,7 +311,7 @@ func (k *Keeper) ApplyMessageWithConfig(
 		return nil, errorsmod.Wrap(err, "failed to create new SGX rpc client")
 	}
 
-	err = k.prepareTxForSgx(ctx, msg, cfg, sgxRpcClient)
+	err = k.prepareTxForSgx(stateDB, ctx.BlockHeader(), msg, cfg, sgxRpcClient)
 	if err != nil {
 		return nil, errorsmod.Wrap(err, "failed to create new RPC server")
 	}
@@ -451,16 +452,16 @@ func (k *Keeper) ApplyMessageWithConfig(
 }
 
 // prepareTxForSgx prepares the transaction for the SGX enclave.
-func (k *Keeper) prepareTxForSgx(ctx sdk.Context, msg core.Message, cfg *EVMConfig, sgxRpcClient *sgxRpcClient) error {
+func (k *Keeper) prepareTxForSgx(stateDB *statedb.StateDB, header cmtproto.Header, msg core.Message, cfg *EVMConfig, sgxRpcClient *sgxRpcClient) error {
 	fmt.Printf("prepareTxForSgx setting k.sdkCtx %p\n", k)
-	k.sdkCtx = ctx
+	k.stateDB = stateDB
 
 	chainConfigJson, err := json.Marshal(cfg.ChainConfig)
 	if err != nil {
 		return err
 	}
 	args := PrepareTxArgs{
-		Header: ctx.BlockHeader(),
+		Header: header,
 		Msg:    msg,
 		EvmConfig: PrepareTxEVMConfig{
 			ChainConfigJson: chainConfigJson,

@@ -1,15 +1,14 @@
 package keeper
 
 import (
-	"fmt"
 	"math/big"
 	"net"
 	"net/http"
 	"net/rpc"
 
-	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/evmos/ethermint/x/evm/statedb"
+	ethtypes "github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/params"
 )
 
 func (k *Keeper) RunRPCServer() error {
@@ -42,157 +41,419 @@ type EthmRpcServer struct {
 	k *Keeper
 }
 
-func (s *EthmRpcServer) GetHash(height *uint64, hash *common.Hash) error {
-	*hash = s.k.GetHashFn(s.k.sdkCtx)(*height)
+func (s *EthmRpcServer) CreateAccount(args *CreateAccountArgs, reply *CreateAccountReply) error {
+	s.k.stateDB.CreateAccount(args.Address)
+	return nil
+}
+
+func (s *EthmRpcServer) SubBalance(args *SubBalanceArgs, reply *SubBalanceReply) error {
+	s.k.stateDB.SubBalance(args.Address, args.Amount)
 	return nil
 }
 
 func (s *EthmRpcServer) AddBalance(args *AddBalanceArgs, reply *AddBalanceReply) error {
-	return s.k.AddBalance(s.k.sdkCtx, args.Addr, args.Amount)
-}
-
-func (s *EthmRpcServer) SubBalance(args *SubBalanceArgs, reply *SubBalanceReply) error {
-	return s.k.SubBalance(s.k.sdkCtx, args.Addr, args.Amount)
+	s.k.stateDB.AddBalance(args.Address, args.Amount)
+	return nil
 }
 
 func (s *EthmRpcServer) GetBalance(args *GetBalanceArgs, reply *GetBalanceReply) error {
-	reply.Balance = s.k.GetBalance(s.k.sdkCtx, args.Addr, args.Denom)
+	reply.Balance = s.k.stateDB.GetBalance(args.Address)
 	return nil
 }
 
-func (s *EthmRpcServer) GetAccount(args *GetAccountArgs, reply *GetAccountReply) error {
-	fmt.Println("AAA", s.k.sdkCtx)
-	fmt.Printf("GetAccount K address=%p\n", s.k)
-	reply.Account = s.k.GetAccount(s.k.sdkCtx, args.Addr)
+func (s *EthmRpcServer) GetNonce(args *GetNonceArgs, reply *GetNonceReply) error {
+	reply.Nonce = s.k.stateDB.GetNonce(args.Address)
 	return nil
 }
 
-func (s *EthmRpcServer) GetState(args *GetStateArgs, reply *GetStateReply) error {
-	reply.Hash = s.k.GetState(s.k.sdkCtx, args.Addr, args.Key)
+func (s *EthmRpcServer) SetNonce(args *SetNonceArgs, reply *SetNonceReply) error {
+	s.k.stateDB.SetNonce(args.Address, args.Nonce)
+	return nil
+}
+
+func (s *EthmRpcServer) GetCodeHash(args *GetCodeHashArgs, reply *GetCodeHashReply) error {
+	reply.CodeHash = s.k.stateDB.GetCodeHash(args.Address)
 	return nil
 }
 
 func (s *EthmRpcServer) GetCode(args *GetCodeArgs, reply *GetCodeReply) error {
-	reply.Code = s.k.GetCode(s.k.sdkCtx, args.CodeHash)
-	return nil
-}
-
-func (s *EthmRpcServer) SetAccount(args *SetAccountArgs, reply *SetAccountReply) error {
-	return s.k.SetAccount(s.k.sdkCtx, args.Addr, args.Account)
-}
-
-func (s *EthmRpcServer) SetState(args *SetStateArgs, reply *SetStateReply) error {
-	s.k.SetState(s.k.sdkCtx, args.Addr, args.Key, args.Value)
+	reply.Code = s.k.stateDB.GetCode(args.Address)
 	return nil
 }
 
 func (s *EthmRpcServer) SetCode(args *SetCodeArgs, reply *SetCodeReply) error {
-	s.k.SetCode(s.k.sdkCtx, args.CodeHash, args.Code)
+	s.k.stateDB.SetCode(args.Address, args.Code)
 	return nil
 }
 
-func (s *EthmRpcServer) DeleteAccount(args *DeleteAccountArgs, reply *DeleteAccountReply) error {
-	return s.k.DeleteAccount(s.k.sdkCtx, args.Addr)
+func (s *EthmRpcServer) GetCodeSize(args *GetCodeSizeArgs, reply *GetCodeSizeReply) error {
+	reply.CodeSize = s.k.stateDB.GetCodeSize(args.Address)
+	return nil
 }
 
-// AddBalanceArgs is the argument struct for the statedb.Keeper#AddBalance method.
-type AddBalanceArgs struct {
-	Addr   sdk.AccAddress
-	Amount sdk.Coins
+func (s *EthmRpcServer) AddRefund(args *AddRefundArgs, reply *AddRefundReply) error {
+	s.k.stateDB.AddRefund(args.Refund)
+	return nil
 }
 
-// AddBalanceReply is the reply struct for the statedb.Keeper#AddBalance method.
-type AddBalanceReply struct {
+func (s *EthmRpcServer) SubRefund(args *SubRefundArgs, reply *SubRefundReply) error {
+	s.k.stateDB.SubRefund(args.Refund)
+	return nil
 }
 
-// SubBalanceArgs is the argument struct for the statedb.Keeper#SubBalance method.
+func (s *EthmRpcServer) GetRefund(args *GetRefundArgs, reply *GetRefundReply) error {
+	reply.Refund = s.k.stateDB.GetRefund()
+	return nil
+}
+
+func (s *EthmRpcServer) GetCommittedState(args *GetCommittedStateArgs, reply *GetCommittedStateReply) error {
+	reply.Value = s.k.stateDB.GetCommittedState(args.Address, args.Key)
+	return nil
+}
+
+func (s *EthmRpcServer) GetState(args *GetStateArgs, reply *GetStateReply) error {
+	reply.Value = s.k.stateDB.GetState(args.Address, args.Key)
+	return nil
+}
+
+func (s *EthmRpcServer) SetState(args *SetStateArgs, reply *SetStateReply) error {
+	s.k.stateDB.SetState(args.Address, args.Key, args.Value)
+	return nil
+}
+
+func (s *EthmRpcServer) GetTransientState(args *GetTransientStateArgs, reply *GetTransientStateReply) error {
+	reply.Value = s.k.stateDB.GetTransientState(args.Address, args.Key)
+	return nil
+}
+
+func (s *EthmRpcServer) SetTransientState(args *SetTransientStateArgs, reply *SetTransientStateReply) error {
+	s.k.stateDB.SetTransientState(args.Address, args.Key, args.Value)
+	return nil
+}
+
+func (s *EthmRpcServer) SelfDestruct(args *SelfDestructArgs, reply *SelfDestructReply) error {
+	s.k.stateDB.SelfDestruct(args.Address)
+	return nil
+}
+
+func (s *EthmRpcServer) HasSelfDestructed(args *HasSelfDestructedArgs, reply *HasSelfDestructedReply) error {
+	reply.HasSelfDestructed = s.k.stateDB.HasSelfDestructed(args.Address)
+	return nil
+}
+
+func (s *EthmRpcServer) Selfdestruct6780(args *Selfdestruct6780Args, reply *Selfdestruct6780Reply) error {
+	s.k.stateDB.Selfdestruct6780(args.Address)
+	return nil
+}
+
+func (s *EthmRpcServer) Exist(args *ExistArgs, reply *ExistReply) error {
+	reply.Exists = s.k.stateDB.Exist(args.Address)
+	return nil
+}
+
+func (s *EthmRpcServer) Empty(args *EmptyArgs, reply *EmptyReply) error {
+	reply.IsEmpty = s.k.stateDB.Empty(args.Address)
+	return nil
+}
+
+func (s *EthmRpcServer) AddressInAccessList(args *AddressInAccessListArgs, reply *AddressInAccessListReply) error {
+	reply.IsInAccessList = s.k.stateDB.AddressInAccessList(args.Address)
+	return nil
+}
+
+func (s *EthmRpcServer) SlotInAccessList(args *SlotInAccessListArgs, reply *SlotInAccessListReply) error {
+	reply.AddressOk, reply.SlotOk = s.k.stateDB.SlotInAccessList(args.Address, args.Slot)
+	return nil
+}
+
+func (s *EthmRpcServer) AddAddressToAccessList(args *AddAddressToAccessListArgs, reply *AddAddressToAccessListReply) error {
+	s.k.stateDB.AddAddressToAccessList(args.Address)
+	return nil
+}
+
+func (s *EthmRpcServer) AddSlotToAccessList(args *AddSlotToAccessListArgs, reply *AddSlotToAccessListReply) error {
+	s.k.stateDB.AddSlotToAccessList(args.Address, args.Slot)
+	return nil
+}
+
+func (s *EthmRpcServer) Prepare(args *PrepareArgs, reply *PrepareReply) error {
+	s.k.stateDB.Prepare(args.Rules, args.Sender, args.Coinbase, args.Dest, args.Precompiles, args.TxAccesses)
+	return nil
+}
+
+func (s *EthmRpcServer) RevertToSnapshot(args *RevertToSnapshotArgs, reply *RevertToSnapshotReply) error {
+	s.k.stateDB.RevertToSnapshot(args.Snapshot)
+	return nil
+}
+
+func (s *EthmRpcServer) Snapshot(args *SnapshotArgs, reply *SnapshotReply) error {
+	reply.Snapshot = s.k.stateDB.Snapshot()
+	return nil
+}
+
+func (s *EthmRpcServer) AddLog(args *AddLogArgs, reply *AddLogReply) error {
+	s.k.stateDB.AddLog(args.Log)
+	return nil
+}
+
+func (s *EthmRpcServer) AddPreimage(args *AddPreimageArgs, reply *AddPreimageReply) error {
+	s.k.stateDB.AddPreimage(args.Hash, args.Preimage)
+	return nil
+}
+
+type CreateAccountArgs struct {
+	Address common.Address
+}
+
+type CreateAccountReply struct {
+}
+
 type SubBalanceArgs struct {
-	Addr   sdk.AccAddress
-	Amount sdk.Coins
+	Address common.Address
+	Amount  *big.Int
 }
 
-// SubBalanceReply is the reply struct for the statedb.Keeper#SubBalance method.
 type SubBalanceReply struct {
 }
 
-// GetBalanceArgs is the argument struct for the statedb.Keeper#GetBalance method.
-type GetBalanceArgs struct {
-	Addr  sdk.AccAddress
-	Denom string
+type AddBalanceArgs struct {
+	Address common.Address
+	Amount  *big.Int
 }
 
-// GetBalanceReply is the reply struct for the statedb.Keeper#GetBalance method.
+type AddBalanceReply struct {
+}
+
+type GetBalanceArgs struct {
+	Address common.Address
+}
+
 type GetBalanceReply struct {
 	Balance *big.Int
 }
 
-// GetAccountArgs is the argument struct for the statedb.Keeper#GetAccount method.
-type GetAccountArgs struct {
-	Addr common.Address
+type GetNonceArgs struct {
+	Address common.Address
 }
 
-// GetAccountReply is the reply struct for the statedb.Keeper#GetAccount method.
-type GetAccountReply struct {
-	Account *statedb.Account
+type GetNonceReply struct {
+	Nonce uint64
 }
 
-// GetStateArgs is the argument struct for the statedb.Keeper#GetState method.
-type GetStateArgs struct {
-	Addr common.Address
-	Key  common.Hash
+type SetNonceArgs struct {
+	Address common.Address
+	Nonce   uint64
 }
 
-// GetStateReply is the reply struct for the statedb.Keeper#GetState method.
-type GetStateReply struct {
-	Hash common.Hash
+type SetNonceReply struct {
 }
 
-// GetCodeArgs is the argument struct for the statedb.Keeper#GetCode method.
-type GetCodeArgs struct {
+type GetCodeHashArgs struct {
+	Address common.Address
+}
+
+type GetCodeHashReply struct {
 	CodeHash common.Hash
 }
 
-// GetCodeReply is the reply struct for the statedb.Keeper#GetCode method.
+type GetCodeArgs struct {
+	Address common.Address
+}
+
 type GetCodeReply struct {
 	Code []byte
 }
 
-// SetAccountArgs is the argument struct for the statedb.Keeper#SetAccount method.
-type SetAccountArgs struct {
-	Addr    common.Address
-	Account statedb.Account
-}
-
-// SetAccountReply is the reply struct for the statedb.Keeper#SetAccount method.
-type SetAccountReply struct {
-}
-
-// SetStateArgs is the argument struct for the statedb.Keeper#SetState method.
-type SetStateArgs struct {
-	Addr  common.Address
-	Key   common.Hash
-	Value []byte
-}
-
-// SetStateReply is the reply struct for the statedb.Keeper#SetState method.
-type SetStateReply struct {
-}
-
-// SetCodeArgs is the argument struct for the statedb.Keeper#SetCode method.
 type SetCodeArgs struct {
-	CodeHash []byte
-	Code     []byte
+	Address common.Address
+	Code    []byte
 }
 
-// SetCodeReply is the reply struct for the statedb.Keeper#SetCode method.
 type SetCodeReply struct {
 }
 
-// DeleteAccountArgs is the argument struct for the statedb.Keeper#DeleteAccount method.
-type DeleteAccountArgs struct {
-	Addr common.Address
+type GetCodeSizeArgs struct {
+	Address common.Address
 }
 
-// DeleteAccountReply is the reply struct for the statedb.Keeper#DeleteAccount method.
-type DeleteAccountReply struct {
+type GetCodeSizeReply struct {
+	CodeSize int
+}
+
+type AddRefundArgs struct {
+	Refund uint64
+}
+
+type AddRefundReply struct {
+}
+
+type SubRefundArgs struct {
+	Refund uint64
+}
+
+type SubRefundReply struct {
+}
+
+type GetRefundArgs struct {
+}
+
+type GetRefundReply struct {
+	Refund uint64
+}
+
+type GetCommittedStateArgs struct {
+	Address common.Address
+	Key     common.Hash
+}
+
+type GetCommittedStateReply struct {
+	Value common.Hash
+}
+
+type GetStateArgs struct {
+	Address common.Address
+	Key     common.Hash
+}
+
+type GetStateReply struct {
+	Value common.Hash
+}
+
+type SetStateArgs struct {
+	Address common.Address
+	Key     common.Hash
+	Value   common.Hash
+}
+
+type SetStateReply struct {
+}
+
+type GetTransientStateArgs struct {
+	Address common.Address
+	Key     common.Hash
+}
+
+type GetTransientStateReply struct {
+	Value common.Hash
+}
+
+type SetTransientStateArgs struct {
+	Address common.Address
+	Key     common.Hash
+	Value   common.Hash
+}
+
+type SetTransientStateReply struct {
+}
+
+type SelfDestructArgs struct {
+	Address common.Address
+}
+
+type SelfDestructReply struct {
+}
+
+type HasSelfDestructedArgs struct {
+	Address common.Address
+}
+
+type HasSelfDestructedReply struct {
+	HasSelfDestructed bool
+}
+
+type Selfdestruct6780Args struct {
+	Address common.Address
+}
+
+type Selfdestruct6780Reply struct {
+}
+
+type ExistArgs struct {
+	Address common.Address
+}
+
+type ExistReply struct {
+	Exists bool
+}
+
+type EmptyArgs struct {
+	Address common.Address
+}
+
+type EmptyReply struct {
+	IsEmpty bool
+}
+
+type AddressInAccessListArgs struct {
+	Address common.Address
+}
+
+type AddressInAccessListReply struct {
+	IsInAccessList bool
+}
+
+type SlotInAccessListArgs struct {
+	Address common.Address
+	Slot    common.Hash
+}
+
+type SlotInAccessListReply struct {
+	AddressOk bool
+	SlotOk    bool
+}
+
+type AddAddressToAccessListArgs struct {
+	Address common.Address
+}
+
+type AddAddressToAccessListReply struct {
+}
+
+type AddSlotToAccessListArgs struct {
+	Address common.Address
+	Slot    common.Hash
+}
+
+type AddSlotToAccessListReply struct {
+}
+
+type PrepareArgs struct {
+	Rules       params.Rules
+	Sender      common.Address
+	Coinbase    common.Address
+	Dest        *common.Address
+	Precompiles []common.Address
+	TxAccesses  ethtypes.AccessList
+}
+
+type PrepareReply struct {
+}
+
+type RevertToSnapshotArgs struct {
+	Snapshot int
+}
+
+type RevertToSnapshotReply struct {
+}
+
+type SnapshotArgs struct {
+}
+
+type SnapshotReply struct {
+	Snapshot int
+}
+
+type AddLogArgs struct {
+	Log *ethtypes.Log
+}
+
+type AddLogReply struct {
+}
+
+type AddPreimageArgs struct {
+	Hash     common.Hash
+	Preimage []byte
+}
+
+type AddPreimageReply struct {
 }
