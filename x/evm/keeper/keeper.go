@@ -81,9 +81,6 @@ type Keeper struct {
 
 	// ctx stored at the time of prepare SGX call
 	preparedCtxs map[uint64]*sdk.Context
-
-	// ctx
-	handlerId uint64
 }
 
 // NewKeeper generates new evm module keeper
@@ -125,7 +122,6 @@ func NewKeeper(
 		customContractFns: customContractFns,
 		keys:              keys,
 		preparedCtxs:      make(map[uint64]*sdk.Context),
-		handlerId:         0,
 	}
 }
 

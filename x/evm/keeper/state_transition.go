@@ -302,7 +302,7 @@ func (k *Keeper) ApplyMessageWithConfig(
 		return nil, errorsmod.Wrap(err, "failed to create new SGX rpc client")
 	}
 
-	err = k.prepareTxForSgx(ctx, msg, cfg, sgxRPCClient)
+	err, handlerId := k.prepareTxForSgx(ctx, msg, cfg, sgxRPCClient)
 	if err != nil {
 		return nil, errorsmod.Wrap(err, "failed to create new RPC server")
 	}
@@ -319,7 +319,7 @@ func (k *Keeper) ApplyMessageWithConfig(
 			// stateDB.SubBalance(sender.Address(), new(big.Int).Mul(msg.GasPrice, new(big.Int).SetUint64(msg.GasLimit)))
 			var reply StateDBSubBalanceReply
 			err := sgxRPCClient.StateDBSubBalance(StateDBSubBalanceArgs{
-				HandlerId: k.handlerId,
+				HandlerId: handlerId,
 				Caller:    sender,
 				Msg:       msg,
 			}, &reply)
@@ -331,7 +331,7 @@ func (k *Keeper) ApplyMessageWithConfig(
 			// stateDB.SetNonce(sender.Address(), stateDB.GetNonce(sender.Address())+1)
 			var replyNonce StateDBIncreaseNonceReply
 			err = sgxRPCClient.StateDBIncreaseNonce(StateDBIncreaseNonceArgs{
-				HandlerId: k.handlerId,
+				HandlerId: handlerId,
 				Caller:    sender,
 				Msg:       msg,
 			}, &replyNonce)
@@ -346,7 +346,7 @@ func (k *Keeper) ApplyMessageWithConfig(
 				// stateDB.AddBalance(sender.Address(), new(big.Int).Mul(msg.GasPrice, new(big.Int).SetUint64(leftoverGas)))
 				var reply StateDBAddBalanceReply
 				err := sgxRPCClient.StateDBAddBalance(StateDBAddBalanceArgs{
-					HandlerId:   k.handlerId,
+					HandlerId:   handlerId,
 					Caller:      sender,
 					Msg:         msg,
 					LeftoverGas: leftoverGas,
@@ -391,7 +391,7 @@ func (k *Keeper) ApplyMessageWithConfig(
 	// stateDB.Prepare(rules, msg.From, cfg.CoinBase, msg.To, vm.ActivePrecompiles(rules), msg.AccessList)
 	var replyPrepare StateDBPrepareReply
 	err = sgxRPCClient.StateDBPrepare(StateDBPrepareArgs{
-		HandlerId: k.handlerId,
+		HandlerId: handlerId,
 		Msg:       msg,
 		Rules:     rules,
 	}, &replyPrepare)
@@ -408,7 +408,7 @@ func (k *Keeper) ApplyMessageWithConfig(
 		// stateDB.SetNonce(sender.Address(), msg.Nonce)
 		var replyNonce StateDBSetNonceReply
 		err := sgxRPCClient.StateDBSetNonce(StateDBSetNonceArgs{
-			HandlerId: k.handlerId,
+			HandlerId: handlerId,
 			Caller:    sender,
 			Nonce:     msg.Nonce,
 		}, &replyNonce)
@@ -420,7 +420,7 @@ func (k *Keeper) ApplyMessageWithConfig(
 		// ret, _, leftoverGas, vmErr = evm.Create(sender, msg.Data, leftoverGas, msg.Value)
 		var reply CreateReply
 		vmErr = sgxRPCClient.Create(CreateArgs{
-			HandlerId: k.handlerId,
+			HandlerId: handlerId,
 			Caller:    sender,
 			Code:      msg.Data,
 			Gas:       leftoverGas,
@@ -432,7 +432,7 @@ func (k *Keeper) ApplyMessageWithConfig(
 		// Ethermint original code:
 		// stateDB.SetNonce(sender.Address(), msg.Nonce+1)
 		sgxRPCClient.StateDBSetNonce(StateDBSetNonceArgs{
-			HandlerId: k.handlerId,
+			HandlerId: handlerId,
 			Caller:    sender,
 			Nonce:     msg.Nonce + 1,
 		}, &replyNonce)
@@ -441,7 +441,7 @@ func (k *Keeper) ApplyMessageWithConfig(
 		// ret, leftoverGas, vmErr = evm.Call(sender, *msg.To, msg.Data, leftoverGas, msg.Value)
 		var reply CallReply
 		vmErr = sgxRPCClient.Call(CallArgs{
-			HandlerId: k.handlerId,
+			HandlerId: handlerId,
 			Caller:    sender,
 			Addr:      *msg.To,
 			Input:     msg.Data,
@@ -470,7 +470,7 @@ func (k *Keeper) ApplyMessageWithConfig(
 	// Ethermint original code:
 	// leftoverGas += GasToRefund(stateDB.GetRefund(), temporaryGasUsed, refundQuotient)
 	var replyRefund StateDBGetRefundReply
-	err = sgxRPCClient.StateDBGetRefund(StateDBGetRefundArgs{HandlerId: k.handlerId}, &replyRefund)
+	err = sgxRPCClient.StateDBGetRefund(StateDBGetRefundArgs{HandlerId: handlerId}, &replyRefund)
 	if err != nil {
 		return nil, err
 	}
@@ -492,7 +492,7 @@ func (k *Keeper) ApplyMessageWithConfig(
 		// }
 		var reply CommitReply
 		err := sgxRPCClient.Commit(CommitArgs{
-			HandlerId: k.handlerId,
+			HandlerId: handlerId,
 			Commit:    true,
 		}, &reply)
 		if err != nil {
@@ -522,7 +522,7 @@ func (k *Keeper) ApplyMessageWithConfig(
 	// Ethermint original code:
 	// Logs: types.NewLogsFromEth(stateDB.Logs()),
 	var replyLog StateDBGetLogsReply
-	err = sgxRPCClient.StateDBGetLogs(StateDBGetLogsArgs{HandlerId: k.handlerId}, &replyLog)
+	err = sgxRPCClient.StateDBGetLogs(StateDBGetLogsArgs{HandlerId: handlerId}, &replyLog)
 	if err != nil {
 		return nil, err
 	}
@@ -542,29 +542,25 @@ func (k *Keeper) ApplyMessageWithConfig(
 //     SGX
 //   - sends a "PrepareTx" request to the SGX enclave with the relevant tx and
 //     block info
-func (k *Keeper) prepareTxForSgx(ctx sdk.Context, msg core.Message, cfg *EVMConfig, sgxRPCClient *sgxRPCClient) error {
+func (k *Keeper) prepareTxForSgx(ctx sdk.Context, msg core.Message, cfg *EVMConfig, sgxRPCClient *sgxRPCClient) (error, uint64) {
 	// Step 1. Send a "PrepareTx" request to the SGX enclave.
 	ChainConfigJson, err := json.Marshal(cfg.ChainConfig)
 	if err != nil {
-		return err
+		return err, 0
 	}
 
 	var overrides []byte
 	if cfg.Overrides != nil {
 		overrides, err = json.Marshal(cfg.Overrides)
 		if err != nil {
-			return err
+			return err, 0
 		}
 	}
 
-	// Increase handler id
-	k.handlerId++
-
 	ctx.HeaderHash()
 	args := PrepareTxArgs{
-		HandlerId: k.handlerId,
-		Header:    ctx.BlockHeader(),
-		Msg:       msg,
+		Header: ctx.BlockHeader(),
+		Msg:    msg,
 		EvmConfig: PrepareTxEVMConfig{
 			ChainConfigJson: ChainConfigJson,
 			CoinBase:        cfg.CoinBase,
@@ -577,8 +573,16 @@ func (k *Keeper) prepareTxForSgx(ctx sdk.Context, msg core.Message, cfg *EVMConf
 		},
 	}
 
-	// Snapshot the ctx
-	k.preparedCtxs[k.handlerId] = &ctx
+	reply := &PrepareTxReply{}
+	err = sgxRPCClient.PrepareTx(args, reply)
+	if err != nil {
+		return err, 0
+	}
 
-	return sgxRPCClient.PrepareTx(args, &PrepareTxReply{})
+	// Store handler id
+	handlerId := reply.HandlerId
+	// Snapshot the ctx
+	k.preparedCtxs[handlerId] = &ctx
+
+	return err, handlerId
 }

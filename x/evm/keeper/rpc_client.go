@@ -113,9 +113,6 @@ type PrepareTxEVMConfig struct {
 
 // PrepareTxArgs is the argument struct for the SgxRpcServer.PrepareTx RPC method.
 type PrepareTxArgs struct {
-	// Handler Id
-	HandlerId uint64
-
 	TxHash []byte
 	// Header is the Tendermint header of the block in which the transaction
 	// will be executed.
@@ -128,6 +125,8 @@ type PrepareTxArgs struct {
 
 // PrepareTxArgs is the reply struct for the SgxRpcServer.PrepareTx RPC method.
 type PrepareTxReply struct {
+	// Handler Id
+	HandlerId uint64
 }
 
 // CallArgs is the argument struct for the SgxRpcServer.Call RPC method.
