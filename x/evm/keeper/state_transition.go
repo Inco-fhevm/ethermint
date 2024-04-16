@@ -319,8 +319,9 @@ func (k *Keeper) ApplyMessageWithConfig(
 			// stateDB.SubBalance(sender.Address(), new(big.Int).Mul(msg.GasPrice, new(big.Int).SetUint64(msg.GasLimit)))
 			var reply StateDBSubBalanceReply
 			err := sgxRPCClient.StateDBSubBalance(StateDBSubBalanceArgs{
-				Caller: sender,
-				Msg:    msg,
+				HandlerId: k.handlerId,
+				Caller:    sender,
+				Msg:       msg,
 			}, &reply)
 			if err != nil {
 				return nil, err
@@ -330,8 +331,9 @@ func (k *Keeper) ApplyMessageWithConfig(
 			// stateDB.SetNonce(sender.Address(), stateDB.GetNonce(sender.Address())+1)
 			var replyNonce StateDBIncreaseNonceReply
 			err = sgxRPCClient.StateDBIncreaseNonce(StateDBIncreaseNonceArgs{
-				Caller: sender,
-				Msg:    msg,
+				HandlerId: k.handlerId,
+				Caller:    sender,
+				Msg:       msg,
 			}, &replyNonce)
 			if err != nil {
 				return nil, err
@@ -344,6 +346,7 @@ func (k *Keeper) ApplyMessageWithConfig(
 				// stateDB.AddBalance(sender.Address(), new(big.Int).Mul(msg.GasPrice, new(big.Int).SetUint64(leftoverGas)))
 				var reply StateDBAddBalanceReply
 				err := sgxRPCClient.StateDBAddBalance(StateDBAddBalanceArgs{
+					HandlerId:   k.handlerId,
 					Caller:      sender,
 					Msg:         msg,
 					LeftoverGas: leftoverGas,
@@ -388,8 +391,9 @@ func (k *Keeper) ApplyMessageWithConfig(
 	// stateDB.Prepare(rules, msg.From, cfg.CoinBase, msg.To, vm.ActivePrecompiles(rules), msg.AccessList)
 	var replyPrepare StateDBPrepareReply
 	err = sgxRPCClient.StateDBPrepare(StateDBPrepareArgs{
-		Msg:   msg,
-		Rules: rules,
+		HandlerId: k.handlerId,
+		Msg:       msg,
+		Rules:     rules,
 	}, &replyPrepare)
 	if err != nil {
 		return nil, err
@@ -404,8 +408,9 @@ func (k *Keeper) ApplyMessageWithConfig(
 		// stateDB.SetNonce(sender.Address(), msg.Nonce)
 		var replyNonce StateDBSetNonceReply
 		err := sgxRPCClient.StateDBSetNonce(StateDBSetNonceArgs{
-			Caller: sender,
-			Nonce:  msg.Nonce,
+			HandlerId: k.handlerId,
+			Caller:    sender,
+			Nonce:     msg.Nonce,
 		}, &replyNonce)
 		if err != nil {
 			return nil, err
@@ -415,10 +420,11 @@ func (k *Keeper) ApplyMessageWithConfig(
 		// ret, _, leftoverGas, vmErr = evm.Create(sender, msg.Data, leftoverGas, msg.Value)
 		var reply CreateReply
 		vmErr = sgxRPCClient.Create(CreateArgs{
-			Caller: sender,
-			Code:   msg.Data,
-			Gas:    leftoverGas,
-			Value:  msg.Value,
+			HandlerId: k.handlerId,
+			Caller:    sender,
+			Code:      msg.Data,
+			Gas:       leftoverGas,
+			Value:     msg.Value,
 		}, &reply)
 		ret = reply.Ret
 		leftoverGas = reply.LeftOverGas
@@ -426,19 +432,21 @@ func (k *Keeper) ApplyMessageWithConfig(
 		// Ethermint original code:
 		// stateDB.SetNonce(sender.Address(), msg.Nonce+1)
 		sgxRPCClient.StateDBSetNonce(StateDBSetNonceArgs{
-			Caller: sender,
-			Nonce:  msg.Nonce + 1,
+			HandlerId: k.handlerId,
+			Caller:    sender,
+			Nonce:     msg.Nonce + 1,
 		}, &replyNonce)
 	} else {
 		// Ethermint original code:
 		// ret, leftoverGas, vmErr = evm.Call(sender, *msg.To, msg.Data, leftoverGas, msg.Value)
 		var reply CallReply
 		vmErr = sgxRPCClient.Call(CallArgs{
-			Caller: sender,
-			Addr:   *msg.To,
-			Input:  msg.Data,
-			Gas:    leftoverGas,
-			Value:  msg.Value,
+			HandlerId: k.handlerId,
+			Caller:    sender,
+			Addr:      *msg.To,
+			Input:     msg.Data,
+			Gas:       leftoverGas,
+			Value:     msg.Value,
 		}, &reply)
 		ret = reply.Ret
 		leftoverGas = reply.LeftOverGas
@@ -462,7 +470,7 @@ func (k *Keeper) ApplyMessageWithConfig(
 	// Ethermint original code:
 	// leftoverGas += GasToRefund(stateDB.GetRefund(), temporaryGasUsed, refundQuotient)
 	var replyRefund StateDBGetRefundReply
-	err = sgxRPCClient.StateDBGetRefund(StateDBGetRefundArgs{}, &replyRefund)
+	err = sgxRPCClient.StateDBGetRefund(StateDBGetRefundArgs{HandlerId: k.handlerId}, &replyRefund)
 	if err != nil {
 		return nil, err
 	}
@@ -484,7 +492,8 @@ func (k *Keeper) ApplyMessageWithConfig(
 		// }
 		var reply CommitReply
 		err := sgxRPCClient.Commit(CommitArgs{
-			Commit: true,
+			HandlerId: k.handlerId,
+			Commit:    true,
 		}, &reply)
 		if err != nil {
 			return nil, errorsmod.Wrap(err, "failed to commit sgx stateDB")
@@ -513,7 +522,7 @@ func (k *Keeper) ApplyMessageWithConfig(
 	// Ethermint original code:
 	// Logs: types.NewLogsFromEth(stateDB.Logs()),
 	var replyLog StateDBGetLogsReply
-	err = sgxRPCClient.StateDBGetLogs(StateDBGetLogsArgs{}, &replyLog)
+	err = sgxRPCClient.StateDBGetLogs(StateDBGetLogsArgs{HandlerId: k.handlerId}, &replyLog)
 	if err != nil {
 		return nil, err
 	}
@@ -548,10 +557,14 @@ func (k *Keeper) prepareTxForSgx(ctx sdk.Context, msg core.Message, cfg *EVMConf
 		}
 	}
 
+	// Increase handler id
+	k.handlerId++
+
 	ctx.HeaderHash()
 	args := PrepareTxArgs{
-		Header: ctx.BlockHeader(),
-		Msg:    msg,
+		HandlerId: k.handlerId,
+		Header:    ctx.BlockHeader(),
+		Msg:       msg,
 		EvmConfig: PrepareTxEVMConfig{
 			ChainConfigJson: ChainConfigJson,
 			CoinBase:        cfg.CoinBase,
@@ -565,7 +578,7 @@ func (k *Keeper) prepareTxForSgx(ctx sdk.Context, msg core.Message, cfg *EVMConf
 	}
 
 	// Snapshot the ctx
-	k.preparedCtx = ctx
+	k.preparedCtxs[k.handlerId] = &ctx
 
 	return sgxRPCClient.PrepareTx(args, &PrepareTxReply{})
 }

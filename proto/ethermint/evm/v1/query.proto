@@ -385,7 +385,8 @@ message QueryBaseFeeResponse {
 }
 
 message GetHashRequest {
-  uint64 height = 1;
+  uint64 handler_id = 1;
+  uint64 height = 2;
 }
 
 message GetHashResponse {
@@ -394,30 +395,33 @@ message GetHashResponse {
 }
 
 message AddBalanceRequest {
+  uint64 handler_id = 1;
   // Addr   sdk.AccAddress
-  string addr      = 1;
+  string addr      = 2;
 	// Amount sdk.Coins
-  repeated cosmos.base.v1beta1.Coin amount = 2 [(gogoproto.nullable) = false] ;
+  repeated cosmos.base.v1beta1.Coin amount = 3 [(gogoproto.nullable) = false] ;
 }
 
 message AddBalanceResponse {
 }
 
 message SubBalanceRequest {
+  uint64 handler_id = 1;
   // Addr   sdk.AccAddress
-  string addr      = 1;
+  string addr      = 2;
 	// Amount sdk.Coins
-  repeated cosmos.base.v1beta1.Coin amount = 2 [(gogoproto.nullable) = false] ;
+  repeated cosmos.base.v1beta1.Coin amount = 3 [(gogoproto.nullable) = false] ;
 }
 
 message SubBalanceResponse {
 }
 
 message GetBalanceRequest {
+  uint64 handler_id = 1;
   // Addr  sdk.AccAddress
-  string addr      = 1;
+  string addr      = 2;
 	// Denom string
-  string denom     = 2;
+  string denom     = 3;
 }
 
 message GetBalanceResponse {
@@ -426,8 +430,9 @@ message GetBalanceResponse {
 }
 
 message GetAccountRequest {
+  uint64 handler_id = 1;
 	// Addr common.Address
-  string addr      = 1;
+  string addr      = 2;
 }
 
 message GetAccountResponse {
@@ -437,10 +442,12 @@ message GetAccountResponse {
 }
 
 message GetStateRequest {
+  uint64 handler_id = 1;
+
   // Addr common.Address
-  string addr     = 1;
+  string addr     = 2;
 	// Key  common.Hash
-  string key      = 2;
+  string key      = 3;
 }
 
 message GetStateResponse {
@@ -449,8 +456,10 @@ message GetStateResponse {
 }
 
 message GetCodeRequest {
+  uint64 handler_id = 1;
+
 	// CodeHash common.Hash
-  string code_hash = 1;
+  string code_hash = 2;
 }
 
 message GetCodeResponse {
@@ -459,10 +468,12 @@ message GetCodeResponse {
 }
 
 message SetAccountRequest {
+  uint64 handler_id = 1;
+
   // Addr    common.Address
-  string addr = 1;
+  string addr = 2;
 	// Account statedb.Account
-  bytes account = 2;
+  bytes account = 3;
 }
 
 message SetAccountResponse {
@@ -471,30 +482,33 @@ message SetAccountResponse {
 }
 
 message SetStateRequest {
+  uint64 handler_id = 1;
   // Addr    common.Address
-  string addr = 1;
+  string addr = 2;
 	// Key   common.Hash
-  string key = 2;
+  string key = 3;
   // Value []byte
-  bytes value = 3;
+  bytes value = 4;
 }
 
 message SetStateResponse {
 }
 
 message SetCodeRequest {
+  uint64 handler_id = 1;
 	// CodeHash []byte
-  bytes code_hash = 1;
+  bytes code_hash = 2;
 	// Code     []byte
-  bytes code = 2;
+  bytes code = 3;
 }
 
 message SetCodeResponse {
 }
 
 message DeleteAccountRequest {
+  uint64 handler_id = 1;
   // Addr common.Address
-  string addr = 1;
+  string addr = 2;
 }
 
 message DeleteAccountResponse {

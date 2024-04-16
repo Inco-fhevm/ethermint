@@ -762,8 +762,12 @@ func getChainID(ctx sdk.Context, chainID int64) (*big.Int, error) {
 
 // QueryGetHashStateDB queries hash in statedb for sgx
 func (k Keeper) QueryGetHashStateDB(_ context.Context, req *types.GetHashRequest) (*types.GetHashResponse, error) {
-	ctx := k.preparedCtx
-	hash := k.GetHashFn(ctx)(req.Height)
+	ctx := k.preparedCtxs[req.HandlerId]
+	if ctx == nil {
+		return nil, errors.New("context invalid")
+	}
+
+	hash := k.GetHashFn(*ctx)(req.Height)
 
 	res := &types.GetHashResponse{
 		Hash: hash.Hex(),
@@ -774,13 +778,17 @@ func (k Keeper) QueryGetHashStateDB(_ context.Context, req *types.GetHashRequest
 
 // PostAddBalanceStateDB add balance in statedb for sgx
 func (k Keeper) PostAddBalanceStateDB(_ context.Context, req *types.AddBalanceRequest) (*types.AddBalanceResponse, error) {
-	ctx := k.preparedCtx
+	ctx := k.preparedCtxs[req.HandlerId]
+	if ctx == nil {
+		return nil, errors.New("context invalid")
+	}
+
 	addr, err := sdk.AccAddressFromBech32(req.Addr)
 	if err != nil {
 		return nil, err
 	}
 
-	err = k.AddBalance(ctx, addr, req.Amount)
+	err = k.AddBalance(*ctx, addr, req.Amount)
 	if err != nil {
 		return nil, err
 	}
@@ -790,13 +798,17 @@ func (k Keeper) PostAddBalanceStateDB(_ context.Context, req *types.AddBalanceRe
 
 // PostSubBalanceStateDB sub balance in statedb for sgx
 func (k Keeper) PostSubBalanceStateDB(_ context.Context, req *types.SubBalanceRequest) (*types.SubBalanceResponse, error) {
-	ctx := k.preparedCtx
+	ctx := k.preparedCtxs[req.HandlerId]
+	if ctx == nil {
+		return nil, errors.New("context invalid")
+	}
+
 	addr, err := sdk.AccAddressFromBech32(req.Addr)
 	if err != nil {
 		return nil, err
 	}
 
-	err = k.SubBalance(ctx, addr, req.Amount)
+	err = k.SubBalance(*ctx, addr, req.Amount)
 	if err != nil {
 		return nil, err
 	}
@@ -806,13 +818,17 @@ func (k Keeper) PostSubBalanceStateDB(_ context.Context, req *types.SubBalanceRe
 
 // QueryGetBalanceStateDB queries balance in statedb for sgx
 func (k Keeper) QueryGetBalanceStateDB(_ context.Context, req *types.GetBalanceRequest) (*types.GetBalanceResponse, error) {
-	ctx := k.preparedCtx
+	ctx := k.preparedCtxs[req.HandlerId]
+	if ctx == nil {
+		return nil, errors.New("context invalid")
+	}
+
 	addr, err := sdk.AccAddressFromBech32(req.Addr)
 	if err != nil {
 		return nil, err
 	}
 
-	balance := k.GetBalance(ctx, addr, req.Denom)
+	balance := k.GetBalance(*ctx, addr, req.Denom)
 
 	return &types.GetBalanceResponse{
 		Balance: sdkmath.NewIntFromBigInt(balance),
@@ -821,9 +837,13 @@ func (k Keeper) QueryGetBalanceStateDB(_ context.Context, req *types.GetBalanceR
 
 // QueryGetAccountStateDB queries account in statedb for sgx
 func (k Keeper) QueryGetAccountStateDB(_ context.Context, req *types.GetAccountRequest) (*types.GetAccountResponse, error) {
-	ctx := k.preparedCtx
+	ctx := k.preparedCtxs[req.HandlerId]
+	if ctx == nil {
+		return nil, errors.New("context invalid")
+	}
+
 	addr := common.HexToAddress(req.Addr)
-	account := k.GetAccount(ctx, addr)
+	account := k.GetAccount(*ctx, addr)
 	if account == nil {
 		return nil, errors.New("account doesn't exist")
 	}
@@ -840,11 +860,15 @@ func (k Keeper) QueryGetAccountStateDB(_ context.Context, req *types.GetAccountR
 
 // QueryGetStateStateDB queries state in statedb for sgx
 func (k Keeper) QueryGetStateStateDB(_ context.Context, req *types.GetStateRequest) (*types.GetStateResponse, error) {
-	ctx := k.preparedCtx
+	ctx := k.preparedCtxs[req.HandlerId]
+	if ctx == nil {
+		return nil, errors.New("context invalid")
+	}
+
 	addr := common.HexToAddress(req.Addr)
 	key := common.HexToHash(req.Key)
 
-	hash := k.GetState(ctx, addr, key)
+	hash := k.GetState(*ctx, addr, key)
 	return &types.GetStateResponse{
 		Hash: hash.Hex(),
 	}, nil
@@ -852,10 +876,14 @@ func (k Keeper) QueryGetStateStateDB(_ context.Context, req *types.GetStateReque
 
 // QueryGetCodeStateDB queries code in statedb for sgx
 func (k Keeper) QueryGetCodeStateDB(_ context.Context, req *types.GetCodeRequest) (*types.GetCodeResponse, error) {
-	ctx := k.preparedCtx
+	ctx := k.preparedCtxs[req.HandlerId]
+	if ctx == nil {
+		return nil, errors.New("context invalid")
+	}
+
 	codeHash := common.HexToHash(req.CodeHash)
 
-	code := k.GetCode(ctx, codeHash)
+	code := k.GetCode(*ctx, codeHash)
 	return &types.GetCodeResponse{
 		Code: code,
 	}, nil
@@ -863,7 +891,11 @@ func (k Keeper) QueryGetCodeStateDB(_ context.Context, req *types.GetCodeRequest
 
 // PostSetAccountStateDB sets account in statedb for sgx
 func (k Keeper) PostSetAccountStateDB(_ context.Context, req *types.SetAccountRequest) (*types.SetAccountResponse, error) {
-	ctx := k.preparedCtx
+	ctx := k.preparedCtxs[req.HandlerId]
+	if ctx == nil {
+		return nil, errors.New("context invalid")
+	}
+
 	addr := common.HexToAddress(req.Addr)
 
 	var account statedb.Account
@@ -872,7 +904,7 @@ func (k Keeper) PostSetAccountStateDB(_ context.Context, req *types.SetAccountRe
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	err = k.SetAccount(ctx, addr, account)
+	err = k.SetAccount(*ctx, addr, account)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
@@ -882,27 +914,38 @@ func (k Keeper) PostSetAccountStateDB(_ context.Context, req *types.SetAccountRe
 
 // PostSetStateStateDB sets state in statedb for sgx
 func (k Keeper) PostSetStateStateDB(_ context.Context, req *types.SetStateRequest) (*types.SetStateResponse, error) {
-	ctx := k.preparedCtx
+	ctx := k.preparedCtxs[req.HandlerId]
+	if ctx == nil {
+		return nil, errors.New("context invalid")
+	}
+
 	addr := common.HexToAddress(req.Addr)
 	key := common.HexToHash(req.Key)
 
-	k.SetState(ctx, addr, key, req.Value)
+	k.SetState(*ctx, addr, key, req.Value)
 	return &types.SetStateResponse{}, nil
 }
 
 // PostSetCodeStateDB sets code in statedb for sgx
 func (k Keeper) PostSetCodeStateDB(_ context.Context, req *types.SetCodeRequest) (*types.SetCodeResponse, error) {
-	ctx := k.preparedCtx
+	ctx := k.preparedCtxs[req.HandlerId]
+	if ctx == nil {
+		return nil, errors.New("context invalid")
+	}
 
-	k.SetCode(ctx, req.CodeHash, req.Code)
+	k.SetCode(*ctx, req.CodeHash, req.Code)
 	return &types.SetCodeResponse{}, nil
 }
 
 // PostDeleteAccountStateDB delete account in statedb for sgx
 func (k Keeper) PostDeleteAccountStateDB(_ context.Context, req *types.DeleteAccountRequest) (*types.DeleteAccountResponse, error) {
-	ctx := k.preparedCtx
+	ctx := k.preparedCtxs[req.HandlerId]
+	if ctx == nil {
+		return nil, errors.New("context invalid")
+	}
+
 	addr := common.HexToAddress(req.Addr)
 
-	k.DeleteAccount(ctx, addr)
+	k.DeleteAccount(*ctx, addr)
 	return &types.DeleteAccountResponse{}, nil
 }
