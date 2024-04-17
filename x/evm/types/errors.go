@@ -116,6 +116,8 @@ var (
 
 	// ErrInvalidGasLimit returns an error if gas limit value is invalid
 	ErrInvalidGasLimit = errorsmod.Register(ModuleName, codeErrInvalidGasLimit, "invalid gas limit")
+
+	ErrRPCConnectionDown = errors.New("connection refused")
 )
 
 // NewExecErrorWithReason unpacks the revert return bytes and returns a wrapped error

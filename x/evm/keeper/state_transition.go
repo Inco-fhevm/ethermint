@@ -19,6 +19,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/big"
+	"strings"
 
 	cmttypes "github.com/cometbft/cometbft/types"
 
@@ -302,7 +303,7 @@ func (k *Keeper) ApplyMessageWithConfig(
 		return nil, errorsmod.Wrap(err, "failed to create new SGX rpc client")
 	}
 
-	err, handlerId := k.prepareTxForSgx(ctx, msg, cfg, sgxRPCClient)
+	handlerId, err := k.prepareTxForSgx(ctx, msg, cfg, sgxRPCClient)
 	if err != nil {
 		return nil, errorsmod.Wrap(err, "failed to create new RPC server")
 	}
@@ -324,6 +325,10 @@ func (k *Keeper) ApplyMessageWithConfig(
 				Msg:       msg,
 			}, &reply)
 			if err != nil {
+				// panic cosmos if sgx isn't available.
+				if k.IsSgxDownError(err) {
+					panic("sgx rpc server is down")
+				}
 				return nil, err
 			}
 
@@ -336,6 +341,10 @@ func (k *Keeper) ApplyMessageWithConfig(
 				Msg:       msg,
 			}, &replyNonce)
 			if err != nil {
+				// panic cosmos if sgx isn't available.
+				if k.IsSgxDownError(err) {
+					panic("sgx rpc server is down")
+				}
 				return nil, err
 			}
 		}
@@ -352,6 +361,11 @@ func (k *Keeper) ApplyMessageWithConfig(
 					LeftoverGas: leftoverGas,
 				}, &reply)
 				if err != nil {
+					// panic cosmos if sgx isn't available.
+					if k.IsSgxDownError(err) {
+						panic("sgx rpc server is down")
+					}
+
 					k.Logger(ctx).Error("failed to add balance to sgx stateDB", "error", err)
 				}
 			}
@@ -396,6 +410,11 @@ func (k *Keeper) ApplyMessageWithConfig(
 		Rules:     rules,
 	}, &replyPrepare)
 	if err != nil {
+		// panic cosmos if sgx isn't available.
+		if k.IsSgxDownError(err) {
+			panic("sgx rpc server is down")
+		}
+
 		return nil, err
 	}
 
@@ -413,6 +432,11 @@ func (k *Keeper) ApplyMessageWithConfig(
 			Nonce:     msg.Nonce,
 		}, &replyNonce)
 		if err != nil {
+			// panic cosmos if sgx isn't available.
+			if k.IsSgxDownError(err) {
+				panic("sgx rpc server is down")
+			}
+
 			return nil, err
 		}
 
@@ -428,14 +452,30 @@ func (k *Keeper) ApplyMessageWithConfig(
 		}, &reply)
 		ret = reply.Ret
 		leftoverGas = reply.LeftOverGas
+		if vmErr != nil {
+			// panic cosmos if sgx isn't available.
+			if k.IsSgxDownError(vmErr) {
+				panic("sgx rpc server is down")
+			}
+
+			return nil, vmErr
+		}
 
 		// Ethermint original code:
 		// stateDB.SetNonce(sender.Address(), msg.Nonce+1)
-		sgxRPCClient.StateDBSetNonce(StateDBSetNonceArgs{
+		vmErr = sgxRPCClient.StateDBSetNonce(StateDBSetNonceArgs{
 			HandlerId: handlerId,
 			Caller:    sender,
 			Nonce:     msg.Nonce + 1,
 		}, &replyNonce)
+		if vmErr != nil {
+			// panic cosmos if sgx isn't available.
+			if k.IsSgxDownError(vmErr) {
+				panic("sgx rpc server is down")
+			}
+
+			return nil, vmErr
+		}
 	} else {
 		// Ethermint original code:
 		// ret, leftoverGas, vmErr = evm.Call(sender, *msg.To, msg.Data, leftoverGas, msg.Value)
@@ -450,6 +490,15 @@ func (k *Keeper) ApplyMessageWithConfig(
 		}, &reply)
 		ret = reply.Ret
 		leftoverGas = reply.LeftOverGas
+
+		if vmErr != nil {
+			// panic cosmos if sgx isn't available.
+			if k.IsSgxDownError(vmErr) {
+				panic("sgx rpc server is down")
+			}
+
+			return nil, vmErr
+		}
 	}
 
 	refundQuotient := params.RefundQuotient
@@ -472,6 +521,11 @@ func (k *Keeper) ApplyMessageWithConfig(
 	var replyRefund StateDBGetRefundReply
 	err = sgxRPCClient.StateDBGetRefund(StateDBGetRefundArgs{HandlerId: handlerId}, &replyRefund)
 	if err != nil {
+		// panic cosmos if sgx isn't available.
+		if k.IsSgxDownError(err) {
+			panic("sgx rpc server is down")
+		}
+
 		return nil, err
 	}
 
@@ -496,6 +550,10 @@ func (k *Keeper) ApplyMessageWithConfig(
 			Commit:    true,
 		}, &reply)
 		if err != nil {
+			// panic cosmos if sgx isn't available.
+			if k.IsSgxDownError(err) {
+				panic("sgx rpc server is down")
+			}
 			return nil, errorsmod.Wrap(err, "failed to commit sgx stateDB")
 		}
 	}
@@ -524,6 +582,10 @@ func (k *Keeper) ApplyMessageWithConfig(
 	var replyLog StateDBGetLogsReply
 	err = sgxRPCClient.StateDBGetLogs(StateDBGetLogsArgs{HandlerId: handlerId}, &replyLog)
 	if err != nil {
+		// panic cosmos if sgx isn't available.
+		if k.IsSgxDownError(err) {
+			panic("sgx rpc server is down")
+		}
 		return nil, err
 	}
 
@@ -542,18 +604,18 @@ func (k *Keeper) ApplyMessageWithConfig(
 //     SGX
 //   - sends a "PrepareTx" request to the SGX enclave with the relevant tx and
 //     block info
-func (k *Keeper) prepareTxForSgx(ctx sdk.Context, msg core.Message, cfg *EVMConfig, sgxRPCClient *sgxRPCClient) (error, uint64) {
+func (k *Keeper) prepareTxForSgx(ctx sdk.Context, msg core.Message, cfg *EVMConfig, sgxRPCClient *sgxRPCClient) (uint64, error) {
 	// Step 1. Send a "PrepareTx" request to the SGX enclave.
 	ChainConfigJson, err := json.Marshal(cfg.ChainConfig)
 	if err != nil {
-		return err, 0
+		return 0, err
 	}
 
 	var overrides []byte
 	if cfg.Overrides != nil {
 		overrides, err = json.Marshal(cfg.Overrides)
 		if err != nil {
-			return err, 0
+			return 0, err
 		}
 	}
 
@@ -576,13 +638,23 @@ func (k *Keeper) prepareTxForSgx(ctx sdk.Context, msg core.Message, cfg *EVMConf
 	reply := &PrepareTxReply{}
 	err = sgxRPCClient.PrepareTx(args, reply)
 	if err != nil {
-		return err, 0
+		// panic cosmos if sgx isn't available.
+		if k.IsSgxDownError(err) {
+			panic("sgx rpc server is down")
+		}
+
+		return 0, err
 	}
 
 	// Store handler id
 	handlerId := reply.HandlerId
 	// Snapshot the ctx
-	k.preparedCtxs[handlerId] = &ctx
+	k.sdkCtxs[handlerId] = &ctx
 
-	return err, handlerId
+	return handlerId, err
+}
+
+// IsSgxDownError checks if the error is related with RPC server down
+func (k *Keeper) IsSgxDownError(err error) bool {
+	return strings.Contains(err.Error(), types.ErrRPCConnectionDown.Error())
 }

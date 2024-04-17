@@ -25,7 +25,8 @@ func newSgxRPCClient(logger log.Logger) (*sgxRPCClient, error) {
 	// TODO Make ports configurable
 	cl, err := rpc.DialHTTP("tcp", "localhost"+":9092")
 	if err != nil {
-		return nil, err
+		// panic cosmos app here
+		panic("sgx rpc server is down")
 	}
 
 	return &sgxRPCClient{
