@@ -1,0 +1,180 @@
+syntax = "proto3";
+package ethermint.sgx.v1;
+
+option go_package = "github.com/evmos/ethermint/x/sgx/types";
+
+// QueryService defines the gRPC querier service.
+service QueryService {
+  // func (s *SgxRpcServer) PrepareTx(args *keeper.PrepareTxArgs, reply *keeper.PrepareTxReply) error {
+  rpc PrepareTx(PrepareTxRequest) returns (PrepareTxResponse) {
+  }
+
+  // func (s *SgxRpcServer) Create(args *keeper.CreateArgs, reply *keeper.CreateReply) error {
+  rpc Create(CreateRequest) returns (CreateResponse) {
+  }
+
+  // func (s *SgxRpcServer) Call(args *keeper.CallArgs, reply *keeper.CallReply) error {
+  rpc Call(CallRequest) returns (CallResponse) {
+  }
+  
+  // func (s *SgxRpcServer) Commit(args *keeper.CommitArgs, reply *keeper.CommitReply) error {
+  rpc Commit(CommitRequest) returns (CommitResponse) {
+  }
+
+  // func (s *SgxRpcServer) StateDBAddBalance(args *keeper.StateDBAddBalanceArgs, reply *keeper.StateDBAddBalanceReply) error {
+  rpc StateDBAddBalance(StateDBAddBalanceRequest) returns (StateDBAddBalanceResponse) {
+  }
+
+  // func (s *SgxRpcServer) StateDBSubBalance(args *keeper.StateDBSubBalanceArgs, reply *keeper.StateDBSubBalanceReply) error {
+  rpc StateDBSubBalance(StateDBSubBalanceRequest) returns (StateDBSubBalanceResponse) {
+  }
+  
+  // func (s *SgxRpcServer) StateDBSetNonce(args *keeper.StateDBSetNonceArgs, reply *keeper.StateDBSetNonceReply) error {
+  rpc StateDBSetNonce(StateDBSetNonceRequest) returns (StateDBSetNonceResponse) {
+  }
+
+  // func (s *SgxRpcServer) StateDBIncreaseNonce(args *keeper.StateDBIncreaseNonceArgs, reply *keeper.StateDBIncreaseNonceReply) error {
+  rpc StateDBIncreaseNonce(StateDBIncreaseNonceRequest) returns (StateDBIncreaseNonceResponse) {
+  }
+
+  // func (s *SgxRpcServer) StateDBPrepare(args *keeper.StateDBPrepareArgs, reply *keeper.StateDBPrepareReply) error {
+  rpc StateDBPrepare(StateDBPrepareRequest) returns (StateDBPrepareResponse) {
+  }
+
+  // func (s *SgxRpcServer) StateDBGetRefund(args *keeper.StateDBGetRefundArgs, reply *keeper.StateDBGetRefundReply) error {
+  rpc StateDBGetRefund(StateDBGetRefundRequest) returns (StateDBGetRefundResponse) {
+  }
+
+  // func (s *SgxRpcServer) StateDBGetLogs(args *keeper.StateDBGetLogsArgs, reply *keeper.StateDBGetLogsReply) error {
+  rpc StateDBGetLogs(StateDBGetLogsRequest) returns (StateDBGetLogsResponse) {
+  }
+}
+
+message PrepareTxRequest {
+  bytes tx_hash = 1;
+  // Header is the Tendermint header of the block in which the transaction
+  // will be executed.
+  bytes header = 2; // Header cmtproto.Header
+  // Msg is the EVM transaction message to run on the EVM.
+  bytes msg = 3; // Msg core.Message
+  // EvmConfig is the EVM configuration to set.
+  bytes evm_config = 4; // EvmConfig PrepareTxEVMConfig
+}
+
+message PrepareTxResponse {
+  uint64 handler_id  = 1;
+}
+
+message CreateRequest {
+  uint64 handler_id = 1;
+  // Original data type: vm.AccountRef
+  bytes caller      = 2; 
+  bytes code        = 3;
+  uint64 gas        = 4;   
+  // Original data type: *big.Int 
+  bytes value       = 5;
+}
+
+message CreateResponse {
+  bytes ret            = 1;
+  // Original data type: common.Address
+  string contract_addr = 2;
+  uint64 left_over_gas = 3; 
+}
+
+message CallRequest {
+  uint64 handler_id = 1;
+  // Original data type: vm.AccountRef
+  bytes caller      = 2;
+  // Original data type: common.Address
+  string addr       = 3;
+  // Original data type: []byte
+  bytes input       = 4;
+  uint64 gas        = 5;
+  // Original data type: *big.Int
+  bytes value       = 6;
+}
+
+message CallResponse {
+  bytes ret             = 1;
+  uint64 left_over_gas  = 2;
+}
+
+message CommitRequest {
+  uint64 handler_id = 1;
+  bool commit       = 2;
+}
+
+message CommitResponse {
+}
+
+message StateDBAddBalanceRequest {
+  uint64 handler_id       = 1;
+  // Original data type: vm.AccountRef
+  bytes caller            = 2;
+  // Original data type: core.Message
+  bytes msg               = 3;
+  uint64 left_over_gas    = 4; 
+}
+
+message StateDBAddBalanceResponse {
+}
+
+message StateDBSubBalanceRequest {
+  uint64 handler_id = 1;
+  // Original data type: vm.AccountRef
+  bytes caller      = 2;
+  // Original data type: core.Message
+  bytes msg         = 3;
+}
+
+message StateDBSubBalanceResponse {
+}
+
+message StateDBSetNonceRequest {
+  uint64 handler_id = 1;
+  // Original data type: vm.AccountRef
+  bytes caller      = 2;
+  uint64 nonce      = 3;
+}
+
+message StateDBSetNonceResponse {
+}
+
+message StateDBIncreaseNonceRequest {
+  uint64 handler_id = 1;
+  // Original data type: vm.AccountRef
+  bytes caller      = 2;
+  // Original data type: core.Message
+  bytes msg         = 3;
+}
+
+message StateDBIncreaseNonceResponse {
+}
+
+message StateDBPrepareRequest {
+  uint64 handler_id = 1;
+  // Original data type: core.Message
+  bytes msg         = 2;
+  // Original data type: params.Rules
+  bytes rules       = 3;
+}
+
+message StateDBPrepareResponse {
+}
+
+message StateDBGetRefundRequest {
+  uint64 handler_id = 1;
+}
+
+message StateDBGetRefundResponse {
+  uint64 refund = 1;
+}
+
+message StateDBGetLogsRequest {
+  uint64 handler_id = 1;
+}
+
+message StateDBGetLogsResponse {
+  bytes logs = 1; // []*ethtypes.Log
+}

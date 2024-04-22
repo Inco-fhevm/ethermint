@@ -17,7 +17,6 @@ require (
 	cosmossdk.io/x/feegrant v0.1.0
 	cosmossdk.io/x/tx v0.13.1
 	cosmossdk.io/x/upgrade v0.1.1
-	github.com/Inco-fhevm/inco-monorepo/sgx v0.0.0-00010101000000-000000000000
 	github.com/btcsuite/btcd v0.23.4
 	github.com/btcsuite/btcd/btcutil v1.1.3
 	github.com/cometbft/cometbft v0.38.6
@@ -252,7 +251,6 @@ require (
 replace (
 	// use cosmos keyring
 	github.com/99designs/keyring => github.com/cosmos/keyring v1.2.0
-	github.com/Inco-fhevm/inco-monorepo/sgx => ../inco-monorepo/sgx
 	// todo: remove this when go ethereum release new version
 	github.com/cockroachdb/pebble v1.1.0 => github.com/cockroachdb/pebble v0.0.0-20231101195458-481da04154d6
 	// Fix upstream GHSA-h395-qcrw-5vmq vulnerability.

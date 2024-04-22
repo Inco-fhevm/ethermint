@@ -7,7 +7,6 @@ import (
 	"net"
 
 	"cosmossdk.io/log"
-	sgxtypes "github.com/Inco-fhevm/inco-monorepo/sgx/evm/types"
 	codectypes "github.com/cosmos/cosmos-sdk/codec/types"
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/ethereum/go-ethereum/common"
@@ -15,6 +14,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/params"
 	evmtypes "github.com/evmos/ethermint/x/evm/types"
+	sgxtypes "github.com/evmos/ethermint/x/sgx/types"
 	"github.com/pkg/errors"
 	"google.golang.org/grpc"
 )
@@ -96,10 +96,6 @@ func (c *sgxGrpcClient) Call(handlerId uint64, caller vm.AccountRef, addr common
 	}
 
 	valueBytes := value.Bytes()
-	if err != nil {
-		return nil, err
-	}
-
 	addrHex := addr.Hex()
 	req := &sgxtypes.CallRequest{
 		HandlerId: handlerId,
@@ -128,10 +124,6 @@ func (c *sgxGrpcClient) Create(handlerId uint64, caller vm.AccountRef, code []by
 	}
 
 	valueBytes := value.Bytes()
-	if err != nil {
-		return nil, err
-	}
-
 	req := &sgxtypes.CreateRequest{
 		HandlerId: handlerId,
 		Caller:    callerBytes,
