@@ -298,12 +298,12 @@ func (k *Keeper) ApplyMessageWithConfig(
 		return nil, errorsmod.Wrap(types.ErrCallDisabled, "failed to call contract")
 	}
 
-	sgxRPCClient, err := newSgxRPCClient(k.Logger(ctx))
+	sgxGrpcClient, err := newSgxGrpcClient(k.Logger(ctx))
 	if err != nil {
 		return nil, errorsmod.Wrap(err, "failed to create new SGX rpc client")
 	}
 
-	handlerId, err := k.prepareTxForSgx(ctx, msg, cfg, sgxRPCClient)
+	handlerId, err := k.prepareTxForSgx(ctx, msg, cfg, sgxGrpcClient)
 	if err != nil {
 		return nil, errorsmod.Wrap(err, "failed to create new RPC server")
 	}
@@ -318,12 +318,7 @@ func (k *Keeper) ApplyMessageWithConfig(
 
 			// Ethermint original code:
 			// stateDB.SubBalance(sender.Address(), new(big.Int).Mul(msg.GasPrice, new(big.Int).SetUint64(msg.GasLimit)))
-			var reply StateDBSubBalanceReply
-			err := sgxRPCClient.StateDBSubBalance(StateDBSubBalanceArgs{
-				HandlerId: handlerId,
-				Caller:    sender,
-				Msg:       msg,
-			}, &reply)
+			_, err := sgxGrpcClient.StateDBSubBalance(handlerId, sender, msg)
 			if err != nil {
 				// panic cosmos if sgx isn't available.
 				if k.IsSgxDownError(err) {
@@ -334,12 +329,7 @@ func (k *Keeper) ApplyMessageWithConfig(
 
 			// Ethermint original code:
 			// stateDB.SetNonce(sender.Address(), stateDB.GetNonce(sender.Address())+1)
-			var replyNonce StateDBIncreaseNonceReply
-			err = sgxRPCClient.StateDBIncreaseNonce(StateDBIncreaseNonceArgs{
-				HandlerId: handlerId,
-				Caller:    sender,
-				Msg:       msg,
-			}, &replyNonce)
+			_, err = sgxGrpcClient.StateDBIncreaseNonce(handlerId, sender, msg)
 			if err != nil {
 				// panic cosmos if sgx isn't available.
 				if k.IsSgxDownError(err) {
@@ -353,13 +343,7 @@ func (k *Keeper) ApplyMessageWithConfig(
 			if cfg.DebugTrace {
 				// Ethermint original code:
 				// stateDB.AddBalance(sender.Address(), new(big.Int).Mul(msg.GasPrice, new(big.Int).SetUint64(leftoverGas)))
-				var reply StateDBAddBalanceReply
-				err := sgxRPCClient.StateDBAddBalance(StateDBAddBalanceArgs{
-					HandlerId:   handlerId,
-					Caller:      sender,
-					Msg:         msg,
-					LeftoverGas: leftoverGas,
-				}, &reply)
+				_, err := sgxGrpcClient.StateDBAddBalance(handlerId, sender, msg, leftoverGas)
 				if err != nil {
 					// panic cosmos if sgx isn't available.
 					if k.IsSgxDownError(err) {
@@ -403,12 +387,7 @@ func (k *Keeper) ApplyMessageWithConfig(
 
 	// Ethermint original code:
 	// stateDB.Prepare(rules, msg.From, cfg.CoinBase, msg.To, vm.ActivePrecompiles(rules), msg.AccessList)
-	var replyPrepare StateDBPrepareReply
-	err = sgxRPCClient.StateDBPrepare(StateDBPrepareArgs{
-		HandlerId: handlerId,
-		Msg:       msg,
-		Rules:     rules,
-	}, &replyPrepare)
+	_, err = sgxGrpcClient.StateDBPrepare(handlerId, msg, rules)
 	if err != nil {
 		// panic cosmos if sgx isn't available.
 		if k.IsSgxDownError(err) {
@@ -425,12 +404,7 @@ func (k *Keeper) ApplyMessageWithConfig(
 
 		// Ethermint original code:
 		// stateDB.SetNonce(sender.Address(), msg.Nonce)
-		var replyNonce StateDBSetNonceReply
-		err := sgxRPCClient.StateDBSetNonce(StateDBSetNonceArgs{
-			HandlerId: handlerId,
-			Caller:    sender,
-			Nonce:     msg.Nonce,
-		}, &replyNonce)
+		_, err := sgxGrpcClient.StateDBSetNonce(handlerId, sender, msg.Nonce)
 		if err != nil {
 			// panic cosmos if sgx isn't available.
 			if k.IsSgxDownError(err) {
@@ -442,16 +416,9 @@ func (k *Keeper) ApplyMessageWithConfig(
 
 		// Ethermint original code:
 		// ret, _, leftoverGas, vmErr = evm.Create(sender, msg.Data, leftoverGas, msg.Value)
-		var reply CreateReply
-		vmErr = sgxRPCClient.Create(CreateArgs{
-			HandlerId: handlerId,
-			Caller:    sender,
-			Code:      msg.Data,
-			Gas:       leftoverGas,
-			Value:     msg.Value,
-		}, &reply)
-		ret = reply.Ret
-		leftoverGas = reply.LeftOverGas
+		resp, vmErr := sgxGrpcClient.Create(handlerId, sender, msg.Data, leftoverGas, msg.Value)
+		ret = resp.Ret
+		leftoverGas = resp.LeftOverGas
 		if vmErr != nil {
 			// panic cosmos if sgx isn't available.
 			if k.IsSgxDownError(vmErr) {
@@ -463,11 +430,7 @@ func (k *Keeper) ApplyMessageWithConfig(
 
 		// Ethermint original code:
 		// stateDB.SetNonce(sender.Address(), msg.Nonce+1)
-		vmErr = sgxRPCClient.StateDBSetNonce(StateDBSetNonceArgs{
-			HandlerId: handlerId,
-			Caller:    sender,
-			Nonce:     msg.Nonce + 1,
-		}, &replyNonce)
+		_, vmErr = sgxGrpcClient.StateDBSetNonce(handlerId, sender, msg.Nonce+1)
 		if vmErr != nil {
 			// panic cosmos if sgx isn't available.
 			if k.IsSgxDownError(vmErr) {
@@ -479,17 +442,9 @@ func (k *Keeper) ApplyMessageWithConfig(
 	} else {
 		// Ethermint original code:
 		// ret, leftoverGas, vmErr = evm.Call(sender, *msg.To, msg.Data, leftoverGas, msg.Value)
-		var reply CallReply
-		vmErr = sgxRPCClient.Call(CallArgs{
-			HandlerId: handlerId,
-			Caller:    sender,
-			Addr:      *msg.To,
-			Input:     msg.Data,
-			Gas:       leftoverGas,
-			Value:     msg.Value,
-		}, &reply)
-		ret = reply.Ret
-		leftoverGas = reply.LeftOverGas
+		resp, vmErr := sgxGrpcClient.Call(handlerId, sender, *msg.To, msg.Data, leftoverGas, msg.Value)
+		ret = resp.Ret
+		leftoverGas = resp.LeftOverGas
 
 		if vmErr != nil {
 			// panic cosmos if sgx isn't available.
@@ -518,8 +473,7 @@ func (k *Keeper) ApplyMessageWithConfig(
 
 	// Ethermint original code:
 	// leftoverGas += GasToRefund(stateDB.GetRefund(), temporaryGasUsed, refundQuotient)
-	var replyRefund StateDBGetRefundReply
-	err = sgxRPCClient.StateDBGetRefund(StateDBGetRefundArgs{HandlerId: handlerId}, &replyRefund)
+	resp, err := sgxGrpcClient.StateDBGetRefund(handlerId)
 	if err != nil {
 		// panic cosmos if sgx isn't available.
 		if k.IsSgxDownError(err) {
@@ -529,7 +483,7 @@ func (k *Keeper) ApplyMessageWithConfig(
 		return nil, err
 	}
 
-	refund := replyRefund.Refund
+	refund := resp.Refund
 	leftoverGas += GasToRefund(refund, temporaryGasUsed, refundQuotient)
 
 	// EVM execution error needs to be available for the JSON-RPC client
@@ -544,11 +498,7 @@ func (k *Keeper) ApplyMessageWithConfig(
 		// if err := stateDB.Commit(); err != nil {
 		// 		return nil, errorsmod.Wrap(err, "failed to commit stateDB")
 		// }
-		var reply CommitReply
-		err := sgxRPCClient.Commit(CommitArgs{
-			HandlerId: handlerId,
-			Commit:    true,
-		}, &reply)
+		_, err := sgxGrpcClient.Commit(handlerId, true)
 		if err != nil {
 			// panic cosmos if sgx isn't available.
 			if k.IsSgxDownError(err) {
@@ -580,7 +530,7 @@ func (k *Keeper) ApplyMessageWithConfig(
 	// Ethermint original code:
 	// Logs: types.NewLogsFromEth(stateDB.Logs()),
 	var replyLog StateDBGetLogsReply
-	err = sgxRPCClient.StateDBGetLogs(StateDBGetLogsArgs{HandlerId: handlerId}, &replyLog)
+	_, err = sgxGrpcClient.StateDBGetLogs(handlerId)
 	if err != nil {
 		// panic cosmos if sgx isn't available.
 		if k.IsSgxDownError(err) {
@@ -604,7 +554,7 @@ func (k *Keeper) ApplyMessageWithConfig(
 //     SGX
 //   - sends a "PrepareTx" request to the SGX enclave with the relevant tx and
 //     block info
-func (k *Keeper) prepareTxForSgx(ctx sdk.Context, msg core.Message, cfg *EVMConfig, sgxRPCClient *sgxRPCClient) (uint64, error) {
+func (k *Keeper) prepareTxForSgx(ctx sdk.Context, msg core.Message, cfg *EVMConfig, sgxGrpcClient *sgxGrpcClient) (uint64, error) {
 	// Step 1. Send a "PrepareTx" request to the SGX enclave.
 	ChainConfigJson, err := json.Marshal(cfg.ChainConfig)
 	if err != nil {
@@ -635,8 +585,7 @@ func (k *Keeper) prepareTxForSgx(ctx sdk.Context, msg core.Message, cfg *EVMConf
 		},
 	}
 
-	reply := &PrepareTxReply{}
-	err = sgxRPCClient.PrepareTx(args, reply)
+	resp, err := sgxGrpcClient.PrepareTx(args)
 	if err != nil {
 		// panic cosmos if sgx isn't available.
 		if k.IsSgxDownError(err) {
@@ -647,7 +596,7 @@ func (k *Keeper) prepareTxForSgx(ctx sdk.Context, msg core.Message, cfg *EVMConf
 	}
 
 	// Store handler id
-	handlerId := reply.HandlerId
+	handlerId := resp.HandlerId
 	// Snapshot the ctx
 	k.sdkCtxs[handlerId] = &ctx
 
