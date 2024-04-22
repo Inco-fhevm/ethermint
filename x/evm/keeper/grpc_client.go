@@ -30,7 +30,7 @@ func newSgxGrpcClient(logger log.Logger) (*sgxGrpcClient, error) {
 	evmtypes.RegisterInterfaces(interfaceRegistry)
 
 	// Set the node
-	rpcConn, err := grpc.Dial("localhost:9090",
+	rpcConn, err := grpc.Dial("localhost:9092",
 		grpc.WithInsecure(),
 		grpc.WithContextDialer(func(ctx context.Context, url string) (net.Conn, error) {
 			return net.Dial("tcp", url)
