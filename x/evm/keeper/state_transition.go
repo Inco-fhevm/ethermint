@@ -589,8 +589,7 @@ func (k *Keeper) ApplyMessageWithConfig(
 
 	// Ethermint original code:
 	// Logs: types.NewLogsFromEth(stateDB.Logs()),
-	var replyLog StateDBGetLogsReply
-	_, err = sgxGrpcClient.StateDBGetLogs(ctx, &sgxtypes.StateDBGetLogsRequest{HandlerId: handlerId})
+	respLogs, err := sgxGrpcClient.StateDBGetLogs(ctx, &sgxtypes.StateDBGetLogsRequest{HandlerId: handlerId})
 	if err != nil {
 		// panic cosmos if sgx isn't available.
 		if k.IsSgxDownError(err) {
@@ -598,12 +597,16 @@ func (k *Keeper) ApplyMessageWithConfig(
 		}
 		return nil, err
 	}
-
+	var ethlogs []*ethtypes.Log
+	err = json.Unmarshal(respLogs.Logs, &ethlogs)
+	if err != nil {
+		return nil, err
+	}
 	return &types.MsgEthereumTxResponse{
 		GasUsed:   gasUsed,
 		VmError:   vmError,
 		Ret:       ret,
-		Logs:      types.NewLogsFromEth(replyLog.Logs),
+		Logs:      types.NewLogsFromEth(ethlogs),
 		Hash:      cfg.TxConfig.TxHash.Hex(),
 		BlockHash: ctx.HeaderHash(),
 	}, nil
