@@ -166,22 +166,22 @@ message StateDBIncreaseNonceResponse {
 // It is taken from geth:
 // https://github.com/ethereum/go-ethereum/blob/v1.13.5/params/config.go#L848
 message Rules {
-  uint64 chain_id  = 1;
-
-  bool is_homestead_is_eip150 = 2;
-  bool is_eip155 = 3;
-  bool is_eip158 = 4;
-  bool is_byzantium = 5;
-  bool is_constantinople = 6;
-  bool is_petersburg = 7;
-  bool is_istanbul = 8;
-  bool is_berlin = 9;
-  bool is_london = 10;
-  bool is_merge = 11;
-  bool is_shanghai = 12;
-  bool is_cancun = 13;
-  bool is_prague = 14;
-  bool is_verkle = 15;
+  uint64 chain_id = 1;
+	bool is_homestead = 2;
+  bool is_e_i_p150 = 3;
+  bool is_e_i_p155 = 4;
+  bool is_e_i_p158 = 5;
+	bool is_byzantium = 6;
+  bool is_constantinople = 7;
+  bool is_petersburg = 8;
+  bool is_istanbul = 9;
+	bool is_berlin = 10;
+  bool is_london = 11;
+  bool is_merge = 12;
+  bool is_shanghai = 13;
+  bool is_cancun = 14;
+  bool is_prague = 15;
+  bool is_verkle = 16;
 }
 
 // AccessTuple is the element type of an access list.

@@ -407,15 +407,46 @@ func (k *Keeper) ApplyMessageWithConfig(
 
 	// Ethermint original code:
 	// stateDB.Prepare(rules, msg.From, cfg.CoinBase, msg.To, vm.ActivePrecompiles(rules), msg.AccessList)
-	_, err = sgxGrpcClient.StateDBPrepare(ctx, &sgxtypes.StateDBPrepareRequest{
+	dbPrepareReq := &sgxtypes.StateDBPrepareRequest{
 		HandlerId: handlerId,
 		Sender:    msg.From.Bytes(),
 		Coinbase:  cfg.CoinBase.Bytes(),
 		Dest:      msg.To.Bytes(),
-		Rules:     &sgxtypes.Rules{
-			// TODO Add rules
+		Rules: &sgxtypes.Rules{
+			ChainId:          rules.ChainID.Uint64(),
+			IsHomestead:      rules.IsHomestead,
+			IsEIP150:         rules.IsEIP150,
+			IsEIP155:         rules.IsEIP155,
+			IsEIP158:         rules.IsEIP158,
+			IsByzantium:      rules.IsByzantium,
+			IsConstantinople: rules.IsConstantinople,
+			IsPetersburg:     rules.IsPetersburg,
+			IsIstanbul:       rules.IsIstanbul,
+			IsBerlin:         rules.IsBerlin,
+			IsLondon:         rules.IsLondon,
+			IsMerge:          rules.IsMerge,
+			IsShanghai:       rules.IsMerge,
+			IsCancun:         rules.IsCancun,
+			IsPrague:         rules.IsPrague,
+			IsVerkle:         rules.IsVerkle,
 		},
-	})
+	}
+
+	for _, accList := range msg.AccessList {
+		storageKeys := make([][]byte, 0)
+		if accList.StorageKeys != nil && len(accList.StorageKeys) > 0 {
+			for _, storageKey := range accList.StorageKeys {
+				storageKeys = append(storageKeys, storageKey.Bytes())
+			}
+		}
+
+		dbPrepareReq.AccessList = append(dbPrepareReq.AccessList, &sgxtypes.AccessTuple{
+			Address:     accList.Address[:],
+			StorageKeys: storageKeys,
+		})
+	}
+
+	_, err = sgxGrpcClient.StateDBPrepare(ctx, dbPrepareReq)
 	if err != nil {
 		// panic cosmos if sgx isn't available.
 		if k.IsSgxDownError(err) {
