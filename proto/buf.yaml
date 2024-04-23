@@ -1,6 +1,7 @@
 version: v1
 name: buf.build/evmos/ethermint
 deps:
+  - buf.build/tendermint/tendermint:33ed361a90514289beabf3189e1d7665 # Same version as cosmos-sdk https://github.com/cosmos/cosmos-sdk/blob/7ea0d40ef242f7a1ec4d7b81d8a3278dda43e14f/proto/buf.yaml#L5
   - buf.build/cosmos/cosmos-sdk
   - buf.build/cosmos/cosmos-proto
   - buf.build/cosmos/gogo-proto

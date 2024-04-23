@@ -1,5 +1,8 @@
 syntax = "proto3";
+
 package ethermint.sgx.v1;
+
+import "tendermint/types/types.proto";
 
 option go_package = "github.com/evmos/ethermint/x/sgx/types";
 
@@ -54,7 +57,7 @@ message PrepareTxRequest {
   bytes tx_hash = 1;
   // Header is the Tendermint header of the block in which the transaction
   // will be executed.
-  bytes header = 2; // Header cmtproto.Header
+  .tendermint.types.Header header = 2; // Header cmtproto.Header
   // Msg is the EVM transaction message to run on the EVM.
   bytes msg = 3; // Msg core.Message
   // EvmConfig is the EVM configuration to set.
@@ -62,37 +65,41 @@ message PrepareTxRequest {
 }
 
 message PrepareTxResponse {
+  // handler_id is the unique request ID that is given by the SGX binary.
   uint64 handler_id  = 1;
 }
 
 message CreateRequest {
+  // handler_id is the unique request ID that is given by the SGX binary.
   uint64 handler_id = 1;
-  // Original data type: vm.AccountRef
+  // caller is the account that creates the contract.
+  // Original data type: common.Address
   bytes caller      = 2; 
   bytes code        = 3;
   uint64 gas        = 4;   
-  // Original data type: *big.Int 
-  bytes value       = 5;
+  // value is the amount of wei to send with the contract creation.
+  uint64 value      = 5;
 }
 
 message CreateResponse {
   bytes ret            = 1;
   // Original data type: common.Address
-  string contract_addr = 2;
+  bytes contract_addr  = 2;
   uint64 left_over_gas = 3; 
 }
 
 message CallRequest {
+  // handler_id is the unique request ID that is given by the SGX binary.
   uint64 handler_id = 1;
   // Original data type: vm.AccountRef
   bytes caller      = 2;
   // Original data type: common.Address
-  string addr       = 3;
+  bytes addr        = 3;
   // Original data type: []byte
   bytes input       = 4;
   uint64 gas        = 5;
   // Original data type: *big.Int
-  bytes value       = 6;
+  uint64 value      = 6;
 }
 
 message CallResponse {
@@ -101,37 +108,39 @@ message CallResponse {
 }
 
 message CommitRequest {
+  // handler_id is the unique request ID that is given by the SGX binary.
   uint64 handler_id = 1;
-  bool commit       = 2;
 }
 
 message CommitResponse {
 }
 
 message StateDBAddBalanceRequest {
+  // handler_id is the unique request ID that is given by the SGX binary.
   uint64 handler_id       = 1;
-  // Original data type: vm.AccountRef
+  // caller is the account to add balance too.
   bytes caller            = 2;
-  // Original data type: core.Message
-  bytes msg               = 3;
-  uint64 left_over_gas    = 4; 
+  // amount is the amount to add.
+  uint64 amount           = 3;
 }
 
 message StateDBAddBalanceResponse {
 }
 
 message StateDBSubBalanceRequest {
+  // handler_id is the unique request ID that is given by the SGX binary.
   uint64 handler_id = 1;
-  // Original data type: vm.AccountRef
+  // caller is the account to substract balance from.
   bytes caller      = 2;
-  // Original data type: core.Message
-  bytes msg         = 3;
+  // amount is the amount to substract.
+  uint64 amount     = 3;
 }
 
 message StateDBSubBalanceResponse {
 }
 
 message StateDBSetNonceRequest {
+  // handler_id is the unique request ID that is given by the SGX binary.
   uint64 handler_id = 1;
   // Original data type: vm.AccountRef
   bytes caller      = 2;
@@ -142,28 +151,69 @@ message StateDBSetNonceResponse {
 }
 
 message StateDBIncreaseNonceRequest {
+  // handler_id is the unique request ID that is given by the SGX binary.
   uint64 handler_id = 1;
   // Original data type: vm.AccountRef
   bytes caller      = 2;
-  // Original data type: core.Message
-  bytes msg         = 3;
 }
 
 message StateDBIncreaseNonceResponse {
 }
 
+// Rules wraps ChainConfig and is merely syntactic sugar or can be used for functions
+// that do not have or require information about the block.
+//
+// It is taken from geth:
+// https://github.com/ethereum/go-ethereum/blob/v1.13.5/params/config.go#L848
+message Rules {
+  uint64 chain_id  = 1;
+
+  bool is_homestead_is_eip150 = 2;
+  bool is_eip155 = 3;
+  bool is_eip158 = 4;
+  bool is_byzantium = 5;
+  bool is_constantinople = 6;
+  bool is_petersburg = 7;
+  bool is_istanbul = 8;
+  bool is_berlin = 9;
+  bool is_london = 10;
+  bool is_merge = 11;
+  bool is_shanghai = 12;
+  bool is_cancun = 13;
+  bool is_prague = 14;
+  bool is_verkle = 15;
+}
+
+// AccessTuple is the element type of an access list.
+//
+// It is taken from geth:
+// https://github.com/ethereum/go-ethereum/blob/v1.13.5/core/types/tx_access_list.go#L33
+message AccessTuple {
+  // Original data type: common.Address
+  bytes address = 1;
+  // Original data type: []common.Hash
+  repeated bytes storage_keys    = 2;
+
+}
+
 message StateDBPrepareRequest {
+  // handler_id is the unique request ID that is given by the SGX binary.
   uint64 handler_id = 1;
-  // Original data type: core.Message
-  bytes msg         = 2;
-  // Original data type: params.Rules
-  bytes rules       = 3;
+  // Original data type: common.Address
+  bytes sender         = 2;
+  // Original data type: common.Address
+  bytes coinbase       = 3;
+  // Original data type: common.Address
+  bytes dest           = 4;
+  Rules rules         = 5;
+  repeated AccessTuple access_list = 6;
 }
 
 message StateDBPrepareResponse {
 }
 
 message StateDBGetRefundRequest {
+  // handler_id is the unique request ID that is given by the SGX binary.
   uint64 handler_id = 1;
 }
 
@@ -172,6 +222,7 @@ message StateDBGetRefundResponse {
 }
 
 message StateDBGetLogsRequest {
+  // handler_id is the unique request ID that is given by the SGX binary.
   uint64 handler_id = 1;
 }
 

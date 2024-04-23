@@ -16,12 +16,15 @@
 package keeper
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"math/big"
+	"net"
 	"strings"
 
 	cmttypes "github.com/cometbft/cometbft/types"
+	"google.golang.org/grpc"
 
 	errorsmod "cosmossdk.io/errors"
 	sdkmath "cosmossdk.io/math"
@@ -35,6 +38,8 @@ import (
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
+
+	sgxtypes "github.com/evmos/ethermint/x/sgx/types"
 )
 
 // GetHashFn implements vm.GetHashFunc for Ethermint. It handles 3 cases:
@@ -298,10 +303,14 @@ func (k *Keeper) ApplyMessageWithConfig(
 		return nil, errorsmod.Wrap(types.ErrCallDisabled, "failed to call contract")
 	}
 
-	sgxGrpcClient, err := newSgxGrpcClient(k.Logger(ctx))
-	if err != nil {
-		return nil, errorsmod.Wrap(err, "failed to create new SGX rpc client")
-	}
+	rpcConn, err := grpc.Dial("localhost:9092",
+		grpc.WithInsecure(),
+		grpc.WithContextDialer(func(ctx context.Context, url string) (net.Conn, error) {
+			return net.Dial("tcp", url)
+		}),
+	)
+
+	sgxGrpcClient := sgxtypes.NewQueryServiceClient(rpcConn)
 
 	handlerId, err := k.prepareTxForSgx(ctx, msg, cfg, sgxGrpcClient)
 	if err != nil {
@@ -318,7 +327,11 @@ func (k *Keeper) ApplyMessageWithConfig(
 
 			// Ethermint original code:
 			// stateDB.SubBalance(sender.Address(), new(big.Int).Mul(msg.GasPrice, new(big.Int).SetUint64(msg.GasLimit)))
-			_, err := sgxGrpcClient.StateDBSubBalance(handlerId, sender, msg)
+			_, err := sgxGrpcClient.StateDBSubBalance(ctx, &sgxtypes.StateDBSubBalanceRequest{
+				HandlerId: handlerId,
+				Caller:    sender.Address().Bytes(),
+				Amount:    new(big.Int).Mul(msg.GasPrice, new(big.Int).SetUint64(msg.GasLimit)).Uint64(),
+			})
 			if err != nil {
 				// panic cosmos if sgx isn't available.
 				if k.IsSgxDownError(err) {
@@ -329,7 +342,10 @@ func (k *Keeper) ApplyMessageWithConfig(
 
 			// Ethermint original code:
 			// stateDB.SetNonce(sender.Address(), stateDB.GetNonce(sender.Address())+1)
-			_, err = sgxGrpcClient.StateDBIncreaseNonce(handlerId, sender, msg)
+			_, err = sgxGrpcClient.StateDBIncreaseNonce(ctx, &sgxtypes.StateDBIncreaseNonceRequest{
+				HandlerId: handlerId,
+				Caller:    sender.Address().Bytes(),
+			})
 			if err != nil {
 				// panic cosmos if sgx isn't available.
 				if k.IsSgxDownError(err) {
@@ -343,7 +359,11 @@ func (k *Keeper) ApplyMessageWithConfig(
 			if cfg.DebugTrace {
 				// Ethermint original code:
 				// stateDB.AddBalance(sender.Address(), new(big.Int).Mul(msg.GasPrice, new(big.Int).SetUint64(leftoverGas)))
-				_, err := sgxGrpcClient.StateDBAddBalance(handlerId, sender, msg, leftoverGas)
+				_, err := sgxGrpcClient.StateDBAddBalance(ctx, &sgxtypes.StateDBAddBalanceRequest{
+					HandlerId: handlerId,
+					Caller:    sender.Address().Bytes(),
+					Amount:    new(big.Int).Mul(msg.GasPrice, new(big.Int).SetUint64(leftoverGas)).Uint64(),
+				})
 				if err != nil {
 					// panic cosmos if sgx isn't available.
 					if k.IsSgxDownError(err) {
@@ -387,7 +407,15 @@ func (k *Keeper) ApplyMessageWithConfig(
 
 	// Ethermint original code:
 	// stateDB.Prepare(rules, msg.From, cfg.CoinBase, msg.To, vm.ActivePrecompiles(rules), msg.AccessList)
-	_, err = sgxGrpcClient.StateDBPrepare(handlerId, msg, rules)
+	_, err = sgxGrpcClient.StateDBPrepare(ctx, &sgxtypes.StateDBPrepareRequest{
+		HandlerId: handlerId,
+		Sender:    msg.From.Bytes(),
+		Coinbase:  cfg.CoinBase.Bytes(),
+		Dest:      msg.To.Bytes(),
+		Rules:     &sgxtypes.Rules{
+			// TODO Add rules
+		},
+	})
 	if err != nil {
 		// panic cosmos if sgx isn't available.
 		if k.IsSgxDownError(err) {
@@ -554,7 +582,7 @@ func (k *Keeper) ApplyMessageWithConfig(
 //     SGX
 //   - sends a "PrepareTx" request to the SGX enclave with the relevant tx and
 //     block info
-func (k *Keeper) prepareTxForSgx(ctx sdk.Context, msg core.Message, cfg *EVMConfig, sgxGrpcClient *sgxGrpcClient) (uint64, error) {
+func (k *Keeper) prepareTxForSgx(ctx sdk.Context, msg core.Message, cfg *EVMConfig, sgxGrpcClient sgxtypes.QueryServiceClient) (uint64, error) {
 	// Step 1. Send a "PrepareTx" request to the SGX enclave.
 	ChainConfigJson, err := json.Marshal(cfg.ChainConfig)
 	if err != nil {
