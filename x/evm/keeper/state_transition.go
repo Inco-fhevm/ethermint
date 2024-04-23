@@ -442,7 +442,7 @@ func (k *Keeper) ApplyMessageWithConfig(
 		}
 
 		dbPrepareReq.AccessList = append(dbPrepareReq.AccessList, &sgxtypes.AccessTuple{
-			Address:     accList.Address[:],
+			Address:     accList.Address.Bytes(),
 			StorageKeys: storageKeys,
 		})
 	}
