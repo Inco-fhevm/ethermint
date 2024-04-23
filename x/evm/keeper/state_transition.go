@@ -430,6 +430,7 @@ func (k *Keeper) ApplyMessageWithConfig(
 			IsPrague:         rules.IsPrague,
 			IsVerkle:         rules.IsVerkle,
 		},
+		AccessList: make([]*sgxtypes.AccessTuple, 0),
 	}
 
 	for _, accList := range msg.AccessList {
