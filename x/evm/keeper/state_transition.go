@@ -432,7 +432,7 @@ func (k *Keeper) ApplyMessageWithConfig(
 
 		// Ethermint original code:
 		// stateDB.SetNonce(sender.Address(), msg.Nonce)
-		_, err := sgxGrpcClient.StateDBSetNonce(handlerId, sender, msg.Nonce)
+		_, err := sgxGrpcClient.StateDBSetNonce(ctx, &sgxtypes.StateDBSetNonceRequest{HandlerId: handlerId, Caller: msg.From.Bytes(), Nonce: msg.Nonce})
 		if err != nil {
 			// panic cosmos if sgx isn't available.
 			if k.IsSgxDownError(err) {
@@ -444,7 +444,7 @@ func (k *Keeper) ApplyMessageWithConfig(
 
 		// Ethermint original code:
 		// ret, _, leftoverGas, vmErr = evm.Create(sender, msg.Data, leftoverGas, msg.Value)
-		resp, vmErr := sgxGrpcClient.Create(handlerId, sender, msg.Data, leftoverGas, msg.Value)
+		resp, vmErr := sgxGrpcClient.Create(ctx, &sgxtypes.CreateRequest{HandlerId: handlerId, Caller: msg.From.Bytes(), Code: msg.Data, Gas: leftoverGas, Value: msg.Value.Uint64()})
 		ret = resp.Ret
 		leftoverGas = resp.LeftOverGas
 		if vmErr != nil {
@@ -458,7 +458,7 @@ func (k *Keeper) ApplyMessageWithConfig(
 
 		// Ethermint original code:
 		// stateDB.SetNonce(sender.Address(), msg.Nonce+1)
-		_, vmErr = sgxGrpcClient.StateDBSetNonce(handlerId, sender, msg.Nonce+1)
+		_, vmErr = sgxGrpcClient.StateDBSetNonce(ctx, &sgxtypes.StateDBSetNonceRequest{HandlerId: handlerId, Caller: msg.From.Bytes(), Nonce: msg.Nonce + 1})
 		if vmErr != nil {
 			// panic cosmos if sgx isn't available.
 			if k.IsSgxDownError(vmErr) {
@@ -470,7 +470,7 @@ func (k *Keeper) ApplyMessageWithConfig(
 	} else {
 		// Ethermint original code:
 		// ret, leftoverGas, vmErr = evm.Call(sender, *msg.To, msg.Data, leftoverGas, msg.Value)
-		resp, vmErr := sgxGrpcClient.Call(handlerId, sender, *msg.To, msg.Data, leftoverGas, msg.Value)
+		resp, vmErr := sgxGrpcClient.Call(ctx, &sgxtypes.CallRequest{HandlerId: handlerId, Caller: msg.From.Bytes(), Addr: msg.To.Bytes(), Input: msg.Data, Gas: leftoverGas, Value: msg.Value.Uint64()})
 		ret = resp.Ret
 		leftoverGas = resp.LeftOverGas
 
@@ -501,7 +501,7 @@ func (k *Keeper) ApplyMessageWithConfig(
 
 	// Ethermint original code:
 	// leftoverGas += GasToRefund(stateDB.GetRefund(), temporaryGasUsed, refundQuotient)
-	resp, err := sgxGrpcClient.StateDBGetRefund(handlerId)
+	resp, err := sgxGrpcClient.StateDBGetRefund(ctx, &sgxtypes.StateDBGetRefundRequest{HandlerId: handlerId})
 	if err != nil {
 		// panic cosmos if sgx isn't available.
 		if k.IsSgxDownError(err) {
@@ -526,7 +526,7 @@ func (k *Keeper) ApplyMessageWithConfig(
 		// if err := stateDB.Commit(); err != nil {
 		// 		return nil, errorsmod.Wrap(err, "failed to commit stateDB")
 		// }
-		_, err := sgxGrpcClient.Commit(handlerId, true)
+		_, err := sgxGrpcClient.Commit(ctx, &sgxtypes.CommitRequest{HandlerId: handlerId})
 		if err != nil {
 			// panic cosmos if sgx isn't available.
 			if k.IsSgxDownError(err) {
@@ -558,7 +558,7 @@ func (k *Keeper) ApplyMessageWithConfig(
 	// Ethermint original code:
 	// Logs: types.NewLogsFromEth(stateDB.Logs()),
 	var replyLog StateDBGetLogsReply
-	_, err = sgxGrpcClient.StateDBGetLogs(handlerId)
+	_, err = sgxGrpcClient.StateDBGetLogs(ctx, &sgxtypes.StateDBGetLogsRequest{HandlerId: handlerId})
 	if err != nil {
 		// panic cosmos if sgx isn't available.
 		if k.IsSgxDownError(err) {
@@ -613,7 +613,17 @@ func (k *Keeper) prepareTxForSgx(ctx sdk.Context, msg core.Message, cfg *EVMConf
 		},
 	}
 
-	resp, err := sgxGrpcClient.PrepareTx(args)
+	msgBytes, err := json.Marshal(args.Msg)
+	if err != nil {
+		return 0, err
+	}
+
+	evmConfigBytes, err := json.Marshal(args.EvmConfig)
+	if err != nil {
+		return 0, err
+	}
+
+	resp, err := sgxGrpcClient.PrepareTx(ctx, &sgxtypes.PrepareTxRequest{TxHash: args.TxHash, Header: &args.Header, Msg: msgBytes, EvmConfig: evmConfigBytes})
 	if err != nil {
 		// panic cosmos if sgx isn't available.
 		if k.IsSgxDownError(err) {

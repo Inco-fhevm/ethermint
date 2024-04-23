@@ -57,7 +57,7 @@ message PrepareTxRequest {
   bytes tx_hash = 1;
   // Header is the Tendermint header of the block in which the transaction
   // will be executed.
-  .tendermint.types.Header header = 2; // Header cmtproto.Header
+  tendermint.types.Header header = 2; // Header cmtproto.Header
   // Msg is the EVM transaction message to run on the EVM.
   bytes msg = 3; // Msg core.Message
   // EvmConfig is the EVM configuration to set.
