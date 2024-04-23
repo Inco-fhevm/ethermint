@@ -309,6 +309,9 @@ func (k *Keeper) ApplyMessageWithConfig(
 			return net.Dial("tcp", url)
 		}),
 	)
+	if err != nil {
+		return nil, errorsmod.Wrap(err, "failed to connect to localhost:9092")
+	}
 
 	sgxGrpcClient := sgxtypes.NewQueryServiceClient(rpcConn)
 
@@ -484,8 +487,6 @@ func (k *Keeper) ApplyMessageWithConfig(
 			if k.IsSgxDownError(vmErr) {
 				panic("sgx rpc server is down")
 			}
-
-			return nil, vmErr
 		}
 
 		// Ethermint original code:
@@ -496,8 +497,6 @@ func (k *Keeper) ApplyMessageWithConfig(
 			if k.IsSgxDownError(vmErr) {
 				panic("sgx rpc server is down")
 			}
-
-			return nil, vmErr
 		}
 	} else {
 		// Ethermint original code:
