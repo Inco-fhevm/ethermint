@@ -17,7 +17,6 @@ package keeper
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"math/big"
 	"net"
@@ -642,6 +641,83 @@ func (k *Keeper) ApplyMessageWithConfig(
 	}, nil
 }
 
+func (k *Keeper) prepareSgxChainConfig(cfg *EVMConfig) sgxtypes.ChainConfig {
+	chainConfig := cfg.ChainConfig
+	sgxChainConfig := sgxtypes.ChainConfig{
+		// *big.Int
+		ChainID: chainConfig.ChainID.Uint64(),
+		// *big.Int
+		HomesteadBlock: chainConfig.HomesteadBlock.Uint64(),
+		// *big.Int
+		DAOForkBlock:   chainConfig.DAOForkBlock.Uint64(),
+		DAOForkSupport: chainConfig.DAOForkSupport,
+		// EIP150 implements the Gas price changes (https://github.com/ethereum/EIPs/issues/150)
+		// *big.Int
+		EIP_150Block: chainConfig.EIP150Block.Uint64(),
+		// *big.Int
+		EIP155Block: chainConfig.EIP155Block.Uint64(),
+		// *big.Int
+		EIP158Block: chainConfig.EIP158Block.Uint64(),
+		// *big.Int
+		ByzantiumBlock: chainConfig.ByzantiumBlock.Uint64(),
+		// *big.Int
+		ConstantinopleBlock: chainConfig.ConstantinopleBlock.Uint64(),
+		// *big.Int
+		PetersburgBlock: chainConfig.PetersburgBlock.Uint64(),
+		// *big.Int
+		IstanbulBlock: chainConfig.IstanbulBlock.Uint64(),
+		// *big.Int
+		MuirGlacierBlock: chainConfig.MuirGlacierBlock.Uint64(),
+		// *big.Int
+		BerlinBlock: chainConfig.BerlinBlock.Uint64(),
+		// *big.Int
+		LondonBlock: chainConfig.LondonBlock.Uint64(),
+		// *big.Int
+		ArrowGlacierBlock: chainConfig.ArrowGlacierBlock.Uint64(),
+		// *big.Int
+		GrayGlacierBlock: chainConfig.GrayGlacierBlock.Uint64(),
+		// *big.Int
+		MergeNetsplitBlock: chainConfig.MergeNetsplitBlock.Uint64(),
+
+		// TerminalTotalDifficulty is the amount of total difficulty reached by
+		// the network that triggers the consensus upgrade.
+		// *big.Int
+		TerminalTotalDifficulty: chainConfig.TerminalTotalDifficulty.Uint64(),
+		// TerminalTotalDifficultyPassed is a flag specifying that the network already
+		// passed the terminal total difficulty. Its purpose is to disable legacy sync
+		// even without having seen the TTD locally (safer long term).
+		TerminalTotalDifficultyPassed: chainConfig.TerminalTotalDifficultyPassed,
+		// Various consensus engines
+		Ethash:    &sgxtypes.EthashConfig{},
+		IsDevMode: chainConfig.IsDevMode,
+	}
+
+	if chainConfig.Clique != nil {
+		sgxChainConfig.Clique = &sgxtypes.CliqueConfig{
+			Period: chainConfig.Clique.Period,
+			Epoch:  chainConfig.Clique.Epoch,
+		}
+	}
+
+	if chainConfig.ShanghaiTime != nil {
+		sgxChainConfig.ShanghaiTime = *chainConfig.ShanghaiTime
+	}
+
+	if chainConfig.CancunTime != nil {
+		sgxChainConfig.CancunTime = *chainConfig.CancunTime
+	}
+
+	if chainConfig.PragueTime != nil {
+		sgxChainConfig.PragueTime = *chainConfig.PragueTime
+	}
+
+	if chainConfig.VerkleTime != nil {
+		sgxChainConfig.VerkleTime = *chainConfig.VerkleTime
+	}
+
+	return sgxChainConfig
+}
+
 // prepareTxForSgx prepares the transaction for the SGX enclave. It:
 //   - creates an RPC server around the keeper to receive requests sent by the
 //     SGX
@@ -649,16 +725,35 @@ func (k *Keeper) ApplyMessageWithConfig(
 //     block info
 func (k *Keeper) prepareTxForSgx(ctx sdk.Context, msg core.Message, cfg *EVMConfig, sgxGrpcClient sgxtypes.QueryServiceClient) (uint64, error) {
 	// Step 1. Send a "PrepareTx" request to the SGX enclave.
-	ChainConfigJson, err := json.Marshal(cfg.ChainConfig)
-	if err != nil {
-		return 0, err
-	}
+	chainConfig := k.prepareSgxChainConfig(cfg)
 
-	var overrides []byte
+	overrides := make(map[string]sgxtypes.OverrideAccount, 0)
 	if cfg.Overrides != nil {
-		overrides, err = json.Marshal(cfg.Overrides)
-		if err != nil {
-			return 0, err
+		for address, account := range *cfg.Overrides {
+			overrideAccount := sgxtypes.OverrideAccount{}
+			if account.Nonce != nil {
+				overrideAccount.Nonce = uint64(*account.Nonce)
+			}
+
+			if account.Code != nil {
+				overrideAccount.Code = []byte(*account.Code)
+			}
+
+			*account.Balance.
+			if account.Balance != nil {
+				overrideAccount.Balance = *big.Int(account.Balance)
+			}
+			// // *hexutil.Uint64
+			// Nonce: uint64(*account.Nonce),
+			// // *hexutil.Bytes
+			// Code: acccount.Code,
+			// // **hexutil.Big
+			// Balance: account.Balance,
+
+			// *map[common.Hash]common.Hash
+			// State map[string]string `protobuf:"bytes,4,rep,name=state,proto3" json:"state,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
+			// *map[common.Hash]common.Hash
+			// StateDiff map[string]string `protobuf:"bytes,5,rep,name=state_diff,json=stateDiff,proto3" json:"state_diff,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
 		}
 	}
 
@@ -666,7 +761,7 @@ func (k *Keeper) prepareTxForSgx(ctx sdk.Context, msg core.Message, cfg *EVMConf
 
 	// Prepare EvmConfig
 	evmConfig := sgxtypes.PrepareTxEVMConfig{
-		ChainConfigJson: ChainConfigJson,
+		ChainConfigJson: chainConfig,
 		CoinBase:        cfg.CoinBase.Bytes(),
 		BaseFee:         cfg.BaseFee.Uint64(),
 		DebugTrace:      cfg.DebugTrace,

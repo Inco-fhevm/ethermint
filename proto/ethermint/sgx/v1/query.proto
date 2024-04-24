@@ -264,7 +264,7 @@ message PrepareTxEVMConfig {
 	// underlying params.ChainConfig struct contains pointer fields, they are
 	// not serializable over RPC with gob. Instead, the JSON representation is
 	// used.
-	bytes chain_config_json     = 1;
+	ChainConfig chain_config_json = 1[(gogoproto.nullable) = false];
 	// Fields from EVMConfig
 	// Original type: common.Address
 	bytes coin_base            = 2;
@@ -280,6 +280,80 @@ message PrepareTxEVMConfig {
 	repeated int64 extra_eips  = 8;
 	// *rpctypes.StateOverride : original type
 	bytes overrides           = 9;
+}
+
+message ChainConfig {
+  // *big.Int
+	uint64 chain_i_d = 1; // chainId identifies the current chain and is used for replay protection
+  // *big.Int
+	uint64 homestead_block  = 2; // Homestead switch block (nil = no fork, 0 = already homestead)
+
+  // *big.Int
+	uint64 d_a_o_fork_block  = 3;  // TheDAO hard-fork switch block (nil = no fork)
+	bool d_a_o_fork_support = 4; // Whether the nodes supports or opposes the DAO hard-fork
+
+	// EIP150 implements the Gas price changes (https://github.com/ethereum/EIPs/issues/150)
+  // *big.Int
+	uint64 e_i_p_150_block = 5; // EIP150 HF block (nil = no fork)
+  // *big.Int
+	uint64 e_i_p155_block = 6; // EIP155 HF block
+  // *big.Int 
+	uint64 e_i_p158_block = 7; // EIP158 HF block
+
+  // *big.Int
+	uint64 byzantium_block = 8; // Byzantium switch block (nil = no fork, 0 = already on byzantium)
+  // *big.Int
+	uint64 constantinople_block = 9; // Constantinople switch block (nil = no fork, 0 = already activated)
+  // *big.Int 
+	uint64 petersburg_block = 10;     // Petersburg switch block (nil = same as Constantinople)
+  // *big.Int
+	uint64 istanbul_block = 11;       // Istanbul switch block (nil = no fork, 0 = already on istanbul)
+  // *big.Int
+	uint64 muir_glacier_block = 12;    // Eip-2384 (bomb delay) switch block (nil = no fork, 0 = already activated)
+  // *big.Int
+	uint64 berlin_block = 13;         // Berlin switch block (nil = no fork, 0 = already on berlin)
+  // *big.Int
+	uint64 london_block = 14;         // London switch block (nil = no fork, 0 = already on london)
+  // *big.Int
+	uint64 arrow_glacier_block = 15;   // Eip-4345 (bomb delay) switch block (nil = no fork, 0 = already activated)
+	// *big.Int
+  uint64 gray_glacier_block = 16;    // Eip-5133 (bomb delay) switch block (nil = no fork, 0 = already activated)
+	// *big.Int
+  uint64 merge_netsplit_block = 17;  // Virtual fork after The Merge to use as a network splitter
+
+	// Fork scheduling was switched from blocks to timestamps here
+
+  // *uint64
+	uint64 shanghai_time = 18[(gogoproto.nullable) = true]; // Shanghai switch time (nil = no fork, 0 = already on shanghai)
+  // *uint64
+	uint64 cancun_time   = 19[(gogoproto.nullable) = true];   // Cancun switch time (nil = no fork, 0 = already on cancun)
+  // *uint64
+	uint64 prague_time   = 20[(gogoproto.nullable) = true];   // Prague switch time (nil = no fork, 0 = already on prague)
+  // *uint64
+	uint64 verkle_time   = 21[(gogoproto.nullable) = true];   // Verkle switch time (nil = no fork, 0 = already on verkle)
+
+	// TerminalTotalDifficulty is the amount of total difficulty reached by
+	// the network that triggers the consensus upgrade.
+	// *big.Int 
+	uint64 terminal_total_difficulty = 22;
+
+	// TerminalTotalDifficultyPassed is a flag specifying that the network already
+	// passed the terminal total difficulty. Its purpose is to disable legacy sync
+	// even without having seen the TTD locally (safer long term).
+	bool terminal_total_difficulty_passed = 23;
+
+	// Various consensus engines
+	EthashConfig ethash = 24;
+	CliqueConfig clique = 25;
+	bool is_dev_mode = 26;
+}
+
+message EthashConfig {}
+
+// CliqueConfig is the consensus engine configs for proof-of-authority based sealing.
+message CliqueConfig {
+	uint64 Period = 1; // Number of seconds between blocks to enforce
+	uint64 Epoch = 2;  // Epoch length to reset votes and checkpoint
 }
 
 // TxConfig encapulates the readonly information of current tx for `StateDB`.
@@ -319,4 +393,17 @@ message EthLog {
 	// The Removed field is true if this log was reverted due to a chain reorganisation.
 	// You must pay attention to this field if you receive logs through a filter query.
 	bool removed = 9;
+}
+
+message OverrideAccount {
+  // *hexutil.Uint64
+	uint64 Nonce     = 1;
+  // *hexutil.Bytes
+	bytes Code      = 2;
+  // **hexutil.Big
+	repeated uint64 Balance = 3;
+  // *map[common.Hash]common.Hash
+  map<string,string> state = 4;
+  // *map[common.Hash]common.Hash
+  map<string,string> state_diff = 5;
 }
