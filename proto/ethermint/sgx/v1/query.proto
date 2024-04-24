@@ -3,6 +3,7 @@ syntax = "proto3";
 package ethermint.sgx.v1;
 
 import "tendermint/types/types.proto";
+import "gogoproto/gogo.proto";
 
 option go_package = "github.com/evmos/ethermint/x/sgx/types";
 
@@ -57,11 +58,11 @@ message PrepareTxRequest {
   bytes tx_hash = 1;
   // Header is the Tendermint header of the block in which the transaction
   // will be executed.
-  tendermint.types.Header header = 2; // Header cmtproto.Header
+  tendermint.types.Header header = 2[(gogoproto.nullable) = false]; // Header cmtproto.Header
   // Msg is the EVM transaction message to run on the EVM.
-  bytes msg = 3; // Msg core.Message
+  Message msg = 3[(gogoproto.nullable) = false]; // Msg core.Message
   // EvmConfig is the EVM configuration to set.
-  bytes evm_config = 4; // EvmConfig PrepareTxEVMConfig
+  PrepareTxEVMConfig evm_config = 4[(gogoproto.nullable) = false]; // EvmConfig PrepareTxEVMConfig
 }
 
 message PrepareTxResponse {
@@ -227,5 +228,95 @@ message StateDBGetLogsRequest {
 }
 
 message StateDBGetLogsResponse {
-  bytes logs = 1; // []*ethtypes.Log
+  repeated EthLog log = 1; // []*ethtypes.Log
+}
+
+message Message {
+  // Original type: *common.Address
+	bytes to          = 1;
+  // Original type: common.Address
+	bytes from        = 2;
+	uint64 nonce      = 3;
+  // *big.Int
+	uint64 value      = 4;
+	uint64 gas_limit  = 5;    
+  // Original type: *big.Int
+	uint64 gas_price  = 6;
+  // Original type: *big.Int
+	uint64 gas_fee_cap = 7;
+  // Original type: *big.Int
+	uint64 gas_tip_cap = 8;
+	bytes data        = 9;
+  // Original types: AccessList
+  repeated AccessTuple access_list  = 10 [(gogoproto.nullable) = false];
+  // Original type:  *big.Int
+	uint64 blob_gas_fee_cap           = 11;
+	// Original type: []common.Hash
+  repeated bytes blob_hashes        = 12;
+	// When SkipAccountChecks is true, the message nonce is not checked against the
+	// account nonce in state. It also disables checking that the sender is an EOA.
+	// This field will be set to true for operations like RPC eth_call.
+	bool skip_account_checks          = 13;
+}
+
+message PrepareTxEVMConfig {
+	// ChainConfig is the EVM chain configuration in JSON format. Since the
+	// underlying params.ChainConfig struct contains pointer fields, they are
+	// not serializable over RPC with gob. Instead, the JSON representation is
+	// used.
+	bytes chain_config_json     = 1;
+	// Fields from EVMConfig
+	// Original type: common.Address
+	bytes coin_base            = 2;
+	// Original type: *big.Int
+	uint64 base_fee            = 3;
+	// Original type: statedb.TxConfig
+	TxConfig tx_config         = 4[(gogoproto.nullable) = false];
+	bool debug_trace           = 5;
+	// Fields from EVMConfig.FeeMarketParams struct
+	bool no_base_fee            = 6;
+	// Fields from EVMConfig.Params struct
+	string evm_denom           = 7;
+	repeated int64 extra_eips  = 8;
+	// *rpctypes.StateOverride : original type
+	bytes overrides           = 9;
+}
+
+// TxConfig encapulates the readonly information of current tx for `StateDB`.
+message TxConfig {
+	// Original type:  common.Hash 
+	bytes block_hash  = 1; // hash of current block
+	// Original type: common.Hash 
+	bytes tx_hash     = 2; // hash of current tx
+	uint64 tx_index   = 3; // the index of current transaction
+	uint64 log_index  = 4; // the index of next log within current block
+}
+
+message EthLog {
+	// Consensus fields:
+	// address of the contract that generated the event
+	// Original type: common.Address
+	bytes address = 1;
+	// list of topics provided by the contract.
+	// Original type: []common.Hash
+	repeated bytes topics = 2;
+	// supplied by the contract, usually ABI-encoded
+	bytes data = 3;
+	// Derived fields. These fields are filled in by the node
+	// but not secured by consensus.
+	// block in which the transaction was included
+	uint64 block_number = 4;
+	// hash of the transaction
+	bytes tx_hash = 5;
+	// index of the transaction in the block
+	uint64 tx_index = 6;
+	// hash of the block in which the transaction was included
+  // Original type: common.Hash
+	bytes block_hash = 7;
+	// index of the log in the block
+	uint64 index = 8;
+
+	// The Removed field is true if this log was reverted due to a chain reorganisation.
+	// You must pay attention to this field if you receive logs through a filter query.
+	bool removed = 9;
 }

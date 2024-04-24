@@ -596,11 +596,42 @@ func (k *Keeper) ApplyMessageWithConfig(
 		}
 		return nil, err
 	}
-	var ethlogs []*ethtypes.Log
-	err = json.Unmarshal(respLogs.Logs, &ethlogs)
-	if err != nil {
-		return nil, err
+
+	ethlogs := make([]*ethtypes.Log, 0)
+	for _, log := range respLogs.Log {
+		ethLog := &ethtypes.Log{
+			Address: common.BytesToAddress(log.Address),
+			// list of topics provided by the contract.
+			// supplied by the contract, usually ABI-encoded
+			Data: log.Data,
+
+			// Derived fields. These fields are filled in by the node
+			// but not secured by consensus.
+			// block in which the transaction was included
+			BlockNumber: log.BlockNumber,
+			// hash of the transaction
+			TxHash: common.BytesToHash(log.TxHash),
+			// index of the transaction in the block
+			TxIndex: uint(log.TxIndex),
+			// hash of the block in which the transaction was included
+			BlockHash: common.BytesToHash(log.BlockHash),
+			// index of the log in the block
+			Index: uint(log.Index),
+
+			// The Removed field is true if this log was reverted due to a chain reorganisation.
+			// You must pay attention to this field if you receive logs through a filter query.
+			Removed: log.Removed,
+		}
+
+		topics := make([]common.Hash, 0)
+		for _, topic := range log.Topics {
+			topics = append(topics, common.BytesToHash(topic))
+		}
+
+		ethLog.Topics = topics
+		ethlogs = append(ethlogs, ethLog)
 	}
+
 	return &types.MsgEthereumTxResponse{
 		GasUsed:   gasUsed,
 		VmError:   vmError,
@@ -632,32 +663,80 @@ func (k *Keeper) prepareTxForSgx(ctx sdk.Context, msg core.Message, cfg *EVMConf
 	}
 
 	ctx.HeaderHash()
-	args := PrepareTxArgs{
-		Header: ctx.BlockHeader(),
-		Msg:    msg,
-		EvmConfig: PrepareTxEVMConfig{
-			ChainConfigJson: ChainConfigJson,
-			CoinBase:        cfg.CoinBase,
-			BaseFee:         cfg.BaseFee,
-			TxConfig:        cfg.TxConfig,
-			DebugTrace:      cfg.DebugTrace,
-			NoBaseFee:       cfg.FeeMarketParams.NoBaseFee,
-			EvmDenom:        cfg.Params.EvmDenom,
-			Overrides:       overrides,
-		},
+
+	// Prepare EvmConfig
+	evmConfig := sgxtypes.PrepareTxEVMConfig{
+		ChainConfigJson: ChainConfigJson,
+		CoinBase:        cfg.CoinBase.Bytes(),
+		BaseFee:         cfg.BaseFee.Uint64(),
+		DebugTrace:      cfg.DebugTrace,
+		NoBaseFee:       cfg.FeeMarketParams.NoBaseFee,
+		EvmDenom:        cfg.Params.EvmDenom,
+		Overrides:       overrides,
+	}
+	txConfig := sgxtypes.TxConfig{
+		// Original type:  common.Hash
+		BlockHash: cfg.TxConfig.BlockHash.Bytes(),
+		// Original type: common.Hash
+		TxHash:   cfg.TxConfig.TxHash.Bytes(),
+		TxIndex:  uint64(cfg.TxConfig.TxIndex),
+		LogIndex: uint64(cfg.TxConfig.LogIndex),
 	}
 
-	msgBytes, err := json.Marshal(args.Msg)
-	if err != nil {
-		return 0, err
+	evmConfig.TxConfig = txConfig
+
+	// core.Message
+	sgxMsg := sgxtypes.Message{
+		// Original type: *common.Address
+		To: msg.To.Bytes(),
+		// Original type: common.Address
+		From:  msg.From.Bytes(),
+		Nonce: msg.Nonce,
+		// *big.Int
+		Value:    msg.Value.Uint64(),
+		GasLimit: msg.GasLimit,
+		// Original type: *big.Int
+		GasPrice: msg.GasPrice.Uint64(),
+		// Original type: *big.Int
+		GasFeeCap: msg.GasFeeCap.Uint64(),
+		// Original type: *big.Int
+		GasTipCap: msg.GasTipCap.Uint64(),
+		Data:      msg.Data,
+		// Original types: AccessList
+		// Original type:  *big.Int
+		BlobGasFeeCap: msg.BlobGasFeeCap.Uint64(),
+		// Original type: []common.Hash
+		// When SkipAccountChecks is true, the message nonce is not checked against the
+		// account nonce in state. It also disables checking that the sender is an EOA.
+		// This field will be set to true for operations like RPC eth_call.
+		SkipAccountChecks: msg.SkipAccountChecks,
 	}
 
-	evmConfigBytes, err := json.Marshal(args.EvmConfig)
-	if err != nil {
-		return 0, err
+	// AccessList{}
+	accessList := make([]sgxtypes.AccessTuple, 0)
+	for _, accList := range msg.AccessList {
+		storageKeys := make([][]byte, 0)
+		if accList.StorageKeys != nil && len(accList.StorageKeys) > 0 {
+			for _, storageKey := range accList.StorageKeys {
+				storageKeys = append(storageKeys, storageKey.Bytes())
+			}
+		}
+
+		accessList = append(accessList, sgxtypes.AccessTuple{
+			Address:     accList.Address.Bytes(),
+			StorageKeys: storageKeys,
+		})
 	}
 
-	resp, err := sgxGrpcClient.PrepareTx(ctx, &sgxtypes.PrepareTxRequest{TxHash: args.TxHash, Header: &args.Header, Msg: msgBytes, EvmConfig: evmConfigBytes})
+	blobHashes := make([][]byte, 0)
+	for _, hashes := range msg.BlobHashes {
+		blobHashes = append(blobHashes, hashes.Bytes())
+	}
+
+	sgxMsg.AccessList = accessList
+	sgxMsg.BlobHashes = blobHashes
+
+	resp, err := sgxGrpcClient.PrepareTx(ctx, &sgxtypes.PrepareTxRequest{TxHash: cfg.TxConfig.TxHash.Bytes(), Header: ctx.BlockHeader(), Msg: sgxMsg, EvmConfig: evmConfig})
 	if err != nil {
 		// panic cosmos if sgx isn't available.
 		if k.IsSgxDownError(err) {
