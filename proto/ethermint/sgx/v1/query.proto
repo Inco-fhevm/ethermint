@@ -394,16 +394,3 @@ message EthLog {
 	// You must pay attention to this field if you receive logs through a filter query.
 	bool removed = 9;
 }
-
-message OverrideAccount {
-  // *hexutil.Uint64
-	uint64 Nonce     = 1[(gogoproto.nullable) = true];
-  // *hexutil.Bytes
-	bytes Code      = 2[(gogoproto.nullable) = true];
-  // **hexutil.Big
-	uint64 Balance = 3[(gogoproto.nullable) = true];
-  // *map[common.Hash]common.Hash
-  map<string,string> state = 4[(gogoproto.nullable) = true];
-  // *map[common.Hash]common.Hash
-  map<string,string> state_diff = 5[(gogoproto.nullable) = true];
-}
