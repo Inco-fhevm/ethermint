@@ -279,7 +279,7 @@ message PrepareTxEVMConfig {
 	string evm_denom           = 7;
 	repeated int64 extra_eips  = 8;
 	// *rpctypes.StateOverride : original type
-	map<string,OverrideAccount> overrides = 9;
+	bytes overrides = 9;
 }
 
 message ChainConfig {

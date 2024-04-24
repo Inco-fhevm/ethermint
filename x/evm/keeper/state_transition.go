@@ -17,6 +17,7 @@ package keeper
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"math/big"
 	"net"
@@ -727,37 +728,12 @@ func (k *Keeper) prepareTxForSgx(ctx sdk.Context, msg core.Message, cfg *EVMConf
 	// Step 1. Send a "PrepareTx" request to the SGX enclave.
 	chainConfig := k.prepareSgxChainConfig(cfg)
 
-	var overrides map[string]*sgxtypes.OverrideAccount
+	var overrides []byte
+	var err error
 	if cfg.Overrides != nil {
-		overrides = make(map[string]*sgxtypes.OverrideAccount, 0)
-		for address, account := range *cfg.Overrides {
-			overrideAccount := sgxtypes.OverrideAccount{}
-			if account.Nonce != nil {
-				overrideAccount.Nonce = uint64(*account.Nonce)
-			}
-
-			if account.Code != nil {
-				overrideAccount.Code = []byte(*account.Code)
-			}
-
-			if account.Balance != nil {
-				overrideAccount.Balance = (*big.Int)(*account.Balance).Uint64()
-			}
-
-			// Replace entire state if caller requires.
-			if account.State != nil {
-				for key, value := range *account.State {
-					overrideAccount.State[key.Hex()] = value.Hex()
-				}
-			}
-			// Apply state diff into specified accounts.
-			if account.StateDiff != nil {
-				for key, value := range *account.StateDiff {
-					overrideAccount.StateDiff[key.Hex()] = value.Hex()
-				}
-			}
-
-			overrides[address.Hex()] = &overrideAccount
+		overrides, err = json.Marshal(cfg.Overrides)
+		if err != nil {
+			return 0, err
 		}
 	}
 
