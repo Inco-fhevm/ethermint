@@ -279,7 +279,7 @@ message PrepareTxEVMConfig {
 	string evm_denom           = 7;
 	repeated int64 extra_eips  = 8;
 	// *rpctypes.StateOverride : original type
-	bytes overrides           = 9;
+	map<string,OverrideAccount> overrides = 9;
 }
 
 message ChainConfig {
@@ -397,13 +397,13 @@ message EthLog {
 
 message OverrideAccount {
   // *hexutil.Uint64
-	uint64 Nonce     = 1;
+	uint64 Nonce     = 1[(gogoproto.nullable) = true];
   // *hexutil.Bytes
-	bytes Code      = 2;
+	bytes Code      = 2[(gogoproto.nullable) = true];
   // **hexutil.Big
-	repeated uint64 Balance = 3;
+	uint64 Balance = 3[(gogoproto.nullable) = true];
   // *map[common.Hash]common.Hash
-  map<string,string> state = 4;
+  map<string,string> state = 4[(gogoproto.nullable) = true];
   // *map[common.Hash]common.Hash
-  map<string,string> state_diff = 5;
+  map<string,string> state_diff = 5[(gogoproto.nullable) = true];
 }

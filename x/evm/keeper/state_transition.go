@@ -727,8 +727,9 @@ func (k *Keeper) prepareTxForSgx(ctx sdk.Context, msg core.Message, cfg *EVMConf
 	// Step 1. Send a "PrepareTx" request to the SGX enclave.
 	chainConfig := k.prepareSgxChainConfig(cfg)
 
-	overrides := make(map[string]sgxtypes.OverrideAccount, 0)
+	var overrides map[string]*sgxtypes.OverrideAccount
 	if cfg.Overrides != nil {
+		overrides = make(map[string]*sgxtypes.OverrideAccount, 0)
 		for address, account := range *cfg.Overrides {
 			overrideAccount := sgxtypes.OverrideAccount{}
 			if account.Nonce != nil {
@@ -739,21 +740,24 @@ func (k *Keeper) prepareTxForSgx(ctx sdk.Context, msg core.Message, cfg *EVMConf
 				overrideAccount.Code = []byte(*account.Code)
 			}
 
-			*account.Balance.
 			if account.Balance != nil {
-				overrideAccount.Balance = *big.Int(account.Balance)
+				overrideAccount.Balance = (*big.Int)(*account.Balance).Uint64()
 			}
-			// // *hexutil.Uint64
-			// Nonce: uint64(*account.Nonce),
-			// // *hexutil.Bytes
-			// Code: acccount.Code,
-			// // **hexutil.Big
-			// Balance: account.Balance,
 
-			// *map[common.Hash]common.Hash
-			// State map[string]string `protobuf:"bytes,4,rep,name=state,proto3" json:"state,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
-			// *map[common.Hash]common.Hash
-			// StateDiff map[string]string `protobuf:"bytes,5,rep,name=state_diff,json=stateDiff,proto3" json:"state_diff,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
+			// Replace entire state if caller requires.
+			if account.State != nil {
+				for key, value := range *account.State {
+					overrideAccount.State[key.Hex()] = value.Hex()
+				}
+			}
+			// Apply state diff into specified accounts.
+			if account.StateDiff != nil {
+				for key, value := range *account.StateDiff {
+					overrideAccount.StateDiff[key.Hex()] = value.Hex()
+				}
+			}
+
+			overrides[address.Hex()] = &overrideAccount
 		}
 	}
 
