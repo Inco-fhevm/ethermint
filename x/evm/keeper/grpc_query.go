@@ -353,15 +353,14 @@ func (k Keeper) EstimateGas(c context.Context, req *types.EthCallRequest) (*type
 			To:                msg.To,
 			Nonce:             msg.Nonce,
 			Value:             msg.Value,
-			GasLimit:          gas,
 			GasPrice:          msg.GasPrice,
+			GasLimit:          gas,
 			GasFeeCap:         msg.GasFeeCap,
 			GasTipCap:         msg.GasTipCap,
 			Data:              msg.Data,
 			AccessList:        msg.AccessList,
 			SkipAccountChecks: msg.SkipAccountChecks,
 		}
-
 		// pass false to not commit StateDB
 		rsp, err = k.ApplyMessageWithConfig(ctx, msg, cfg, false)
 		if err != nil {
