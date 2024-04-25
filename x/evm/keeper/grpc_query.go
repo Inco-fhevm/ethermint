@@ -392,7 +392,7 @@ func (k Keeper) EstimateGas(c context.Context, req *types.EthCallRequest) (*type
 						VmError: result.VmError,
 					}, nil
 				}
-				panic(result.VmError)
+				return nil, errors.New(result.VmError)
 			}
 			// Otherwise, the specified gas cap is too low
 			return nil, fmt.Errorf("gas required exceeds allowance (%d)", gasCap)
