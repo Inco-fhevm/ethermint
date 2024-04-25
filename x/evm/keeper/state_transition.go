@@ -17,6 +17,7 @@ package keeper
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"math/big"
 	"net"
@@ -413,7 +414,7 @@ func (k *Keeper) ApplyMessageWithConfig(
 		HandlerId: handlerId,
 		Sender:    msg.From.Bytes(),
 		Coinbase:  cfg.CoinBase.Bytes(),
-		Dest:      msg.To.Bytes(),
+		Dest:      k.SafeAddress2Bytes(msg.To),
 		Rules: &sgxtypes.Rules{
 			ChainId:          rules.ChainID.Uint64(),
 			IsHomestead:      rules.IsHomestead,
@@ -427,7 +428,7 @@ func (k *Keeper) ApplyMessageWithConfig(
 			IsBerlin:         rules.IsBerlin,
 			IsLondon:         rules.IsLondon,
 			IsMerge:          rules.IsMerge,
-			IsShanghai:       rules.IsMerge,
+			IsShanghai:       rules.IsShanghai,
 			IsCancun:         rules.IsCancun,
 			IsPrague:         rules.IsPrague,
 			IsVerkle:         rules.IsVerkle,
@@ -479,14 +480,17 @@ func (k *Keeper) ApplyMessageWithConfig(
 		// Ethermint original code:
 		// ret, _, leftoverGas, vmErr = evm.Create(sender, msg.Data, leftoverGas, msg.Value)
 		resp, vmErr := sgxGrpcClient.Create(ctx, &sgxtypes.CreateRequest{HandlerId: handlerId, Caller: msg.From.Bytes(), Code: msg.Data, Gas: leftoverGas, Value: msg.Value.Uint64()})
-		ret = resp.Ret
-		leftoverGas = resp.LeftOverGas
 		if vmErr != nil {
 			// panic cosmos if sgx isn't available.
 			if k.IsSgxDownError(vmErr) {
 				panic("sgx rpc server is down")
 			}
+
+			return nil, vmErr
 		}
+
+		ret = resp.Ret
+		leftoverGas = resp.LeftOverGas
 
 		// Ethermint original code:
 		// stateDB.SetNonce(sender.Address(), msg.Nonce+1)
@@ -496,14 +500,13 @@ func (k *Keeper) ApplyMessageWithConfig(
 			if k.IsSgxDownError(vmErr) {
 				panic("sgx rpc server is down")
 			}
+
+			return nil, vmErr
 		}
 	} else {
 		// Ethermint original code:
 		// ret, leftoverGas, vmErr = evm.Call(sender, *msg.To, msg.Data, leftoverGas, msg.Value)
-		resp, vmErr := sgxGrpcClient.Call(ctx, &sgxtypes.CallRequest{HandlerId: handlerId, Caller: msg.From.Bytes(), Addr: msg.To.Bytes(), Input: msg.Data, Gas: leftoverGas, Value: msg.Value.Uint64()})
-		ret = resp.Ret
-		leftoverGas = resp.LeftOverGas
-
+		resp, vmErr := sgxGrpcClient.Call(ctx, &sgxtypes.CallRequest{HandlerId: handlerId, Caller: msg.From.Bytes(), Addr: k.SafeAddress2Bytes(msg.To), Input: msg.Data, Gas: leftoverGas, Value: msg.Value.Uint64()})
 		if vmErr != nil {
 			// panic cosmos if sgx isn't available.
 			if k.IsSgxDownError(vmErr) {
@@ -512,6 +515,8 @@ func (k *Keeper) ApplyMessageWithConfig(
 
 			return nil, vmErr
 		}
+		ret = resp.Ret
+		leftoverGas = resp.LeftOverGas
 	}
 
 	refundQuotient := params.RefundQuotient
@@ -641,55 +646,85 @@ func (k *Keeper) ApplyMessageWithConfig(
 	}, nil
 }
 
+func (k *Keeper) SafeBigInt2Uint64Convert(val *big.Int) uint64 {
+	if val == nil {
+		return 0
+	}
+	return val.Uint64()
+}
+
+func (k *Keeper) ChainConfigBitInt2Uint64(val *big.Int) uint64 {
+	if val == nil {
+		return 99999
+	}
+	return val.Uint64()
+}
+
+func (k *Keeper) SafeAddress2Bytes(addr *common.Address) []byte {
+	if addr == nil {
+		return nil
+	}
+	return addr.Bytes()
+}
+
 func (k *Keeper) prepareSgxChainConfig(cfg *EVMConfig) sgxtypes.ChainConfig {
 	chainConfig := cfg.ChainConfig
 	sgxChainConfig := sgxtypes.ChainConfig{
 		// *big.Int
-		ChainID: chainConfig.ChainID.Uint64(),
+		ChainID: k.SafeBigInt2Uint64Convert(chainConfig.ChainID),
 		// *big.Int
-		HomesteadBlock: chainConfig.HomesteadBlock.Uint64(),
+		HomesteadBlock: k.ChainConfigBitInt2Uint64(chainConfig.HomesteadBlock),
 		// *big.Int
-		DAOForkBlock:   chainConfig.DAOForkBlock.Uint64(),
+		DAOForkBlock:   k.ChainConfigBitInt2Uint64(chainConfig.DAOForkBlock),
 		DAOForkSupport: chainConfig.DAOForkSupport,
 		// EIP150 implements the Gas price changes (https://github.com/ethereum/EIPs/issues/150)
 		// *big.Int
-		EIP_150Block: chainConfig.EIP150Block.Uint64(),
+		EIP_150Block: k.ChainConfigBitInt2Uint64(chainConfig.EIP150Block),
 		// *big.Int
-		EIP155Block: chainConfig.EIP155Block.Uint64(),
+		EIP155Block: k.ChainConfigBitInt2Uint64(chainConfig.EIP155Block),
 		// *big.Int
-		EIP158Block: chainConfig.EIP158Block.Uint64(),
+		EIP158Block: k.ChainConfigBitInt2Uint64(chainConfig.EIP158Block),
 		// *big.Int
-		ByzantiumBlock: chainConfig.ByzantiumBlock.Uint64(),
+		ByzantiumBlock: k.ChainConfigBitInt2Uint64(chainConfig.ByzantiumBlock),
 		// *big.Int
-		ConstantinopleBlock: chainConfig.ConstantinopleBlock.Uint64(),
+		ConstantinopleBlock: k.ChainConfigBitInt2Uint64(chainConfig.ConstantinopleBlock),
 		// *big.Int
-		PetersburgBlock: chainConfig.PetersburgBlock.Uint64(),
+		PetersburgBlock: k.ChainConfigBitInt2Uint64(chainConfig.PetersburgBlock),
 		// *big.Int
-		IstanbulBlock: chainConfig.IstanbulBlock.Uint64(),
+		IstanbulBlock: k.ChainConfigBitInt2Uint64(chainConfig.IstanbulBlock),
 		// *big.Int
-		MuirGlacierBlock: chainConfig.MuirGlacierBlock.Uint64(),
+		MuirGlacierBlock: k.ChainConfigBitInt2Uint64(chainConfig.MuirGlacierBlock),
 		// *big.Int
-		BerlinBlock: chainConfig.BerlinBlock.Uint64(),
+		BerlinBlock: k.ChainConfigBitInt2Uint64(chainConfig.BerlinBlock),
 		// *big.Int
-		LondonBlock: chainConfig.LondonBlock.Uint64(),
+		LondonBlock: k.ChainConfigBitInt2Uint64(chainConfig.LondonBlock),
 		// *big.Int
-		ArrowGlacierBlock: chainConfig.ArrowGlacierBlock.Uint64(),
+		ArrowGlacierBlock: k.ChainConfigBitInt2Uint64(chainConfig.ArrowGlacierBlock),
 		// *big.Int
-		GrayGlacierBlock: chainConfig.GrayGlacierBlock.Uint64(),
+		GrayGlacierBlock: k.ChainConfigBitInt2Uint64(chainConfig.GrayGlacierBlock),
 		// *big.Int
-		MergeNetsplitBlock: chainConfig.MergeNetsplitBlock.Uint64(),
+		MergeNetsplitBlock: k.ChainConfigBitInt2Uint64(chainConfig.MergeNetsplitBlock),
 
 		// TerminalTotalDifficulty is the amount of total difficulty reached by
 		// the network that triggers the consensus upgrade.
 		// *big.Int
-		TerminalTotalDifficulty: chainConfig.TerminalTotalDifficulty.Uint64(),
+		TerminalTotalDifficulty: k.SafeBigInt2Uint64Convert(chainConfig.TerminalTotalDifficulty),
 		// TerminalTotalDifficultyPassed is a flag specifying that the network already
 		// passed the terminal total difficulty. Its purpose is to disable legacy sync
 		// even without having seen the TTD locally (safer long term).
 		TerminalTotalDifficultyPassed: chainConfig.TerminalTotalDifficultyPassed,
 		// Various consensus engines
-		Ethash:    &sgxtypes.EthashConfig{},
-		IsDevMode: chainConfig.IsDevMode,
+		Ethash:       nil,
+		Clique:       nil,
+		IsDevMode:    chainConfig.IsDevMode,
+		ShanghaiTime: 100000,
+		CancunTime:   100000,
+		PragueTime:   100000,
+		VerkleTime:   100000,
+	}
+
+	if chainConfig.Ethash != nil {
+		sgxChainConfig.Ethash = &sgxtypes.EthashConfig{}
 	}
 
 	if chainConfig.Clique != nil {
@@ -727,47 +762,20 @@ func (k *Keeper) prepareTxForSgx(ctx sdk.Context, msg core.Message, cfg *EVMConf
 	// Step 1. Send a "PrepareTx" request to the SGX enclave.
 	chainConfig := k.prepareSgxChainConfig(cfg)
 
-	var overrides map[string]*sgxtypes.OverrideAccount
+	var overrides []byte
+	var err error
 	if cfg.Overrides != nil {
-		overrides = make(map[string]*sgxtypes.OverrideAccount, 0)
-		for address, account := range *cfg.Overrides {
-			overrideAccount := sgxtypes.OverrideAccount{}
-			if account.Nonce != nil {
-				overrideAccount.Nonce = uint64(*account.Nonce)
-			}
-
-			if account.Code != nil {
-				overrideAccount.Code = []byte(*account.Code)
-			}
-
-			if account.Balance != nil {
-				overrideAccount.Balance = (*big.Int)(*account.Balance).Uint64()
-			}
-
-			// Replace entire state if caller requires.
-			if account.State != nil {
-				for key, value := range *account.State {
-					overrideAccount.State[key.Hex()] = value.Hex()
-				}
-			}
-			// Apply state diff into specified accounts.
-			if account.StateDiff != nil {
-				for key, value := range *account.StateDiff {
-					overrideAccount.StateDiff[key.Hex()] = value.Hex()
-				}
-			}
-
-			overrides[address.Hex()] = &overrideAccount
+		overrides, err = json.Marshal(cfg.Overrides)
+		if err != nil {
+			return 0, err
 		}
 	}
-
-	ctx.HeaderHash()
 
 	// Prepare EvmConfig
 	evmConfig := sgxtypes.PrepareTxEVMConfig{
 		ChainConfigJson: chainConfig,
 		CoinBase:        cfg.CoinBase.Bytes(),
-		BaseFee:         cfg.BaseFee.Uint64(),
+		BaseFee:         k.SafeBigInt2Uint64Convert(cfg.BaseFee),
 		DebugTrace:      cfg.DebugTrace,
 		NoBaseFee:       cfg.FeeMarketParams.NoBaseFee,
 		EvmDenom:        cfg.Params.EvmDenom,
@@ -787,23 +795,23 @@ func (k *Keeper) prepareTxForSgx(ctx sdk.Context, msg core.Message, cfg *EVMConf
 	// core.Message
 	sgxMsg := sgxtypes.Message{
 		// Original type: *common.Address
-		To: msg.To.Bytes(),
+		To: k.SafeAddress2Bytes(msg.To),
 		// Original type: common.Address
 		From:  msg.From.Bytes(),
 		Nonce: msg.Nonce,
 		// *big.Int
-		Value:    msg.Value.Uint64(),
+		Value:    k.SafeBigInt2Uint64Convert(msg.Value),
 		GasLimit: msg.GasLimit,
 		// Original type: *big.Int
-		GasPrice: msg.GasPrice.Uint64(),
+		GasPrice: k.SafeBigInt2Uint64Convert(msg.GasPrice),
 		// Original type: *big.Int
-		GasFeeCap: msg.GasFeeCap.Uint64(),
+		GasFeeCap: k.SafeBigInt2Uint64Convert(msg.GasFeeCap),
 		// Original type: *big.Int
-		GasTipCap: msg.GasTipCap.Uint64(),
+		GasTipCap: k.SafeBigInt2Uint64Convert(msg.GasTipCap),
 		Data:      msg.Data,
 		// Original types: AccessList
 		// Original type:  *big.Int
-		BlobGasFeeCap: msg.BlobGasFeeCap.Uint64(),
+		BlobGasFeeCap: k.SafeBigInt2Uint64Convert(msg.BlobGasFeeCap),
 		// Original type: []common.Hash
 		// When SkipAccountChecks is true, the message nonce is not checked against the
 		// account nonce in state. It also disables checking that the sender is an EOA.

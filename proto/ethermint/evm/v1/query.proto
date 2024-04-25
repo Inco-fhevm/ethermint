@@ -86,47 +86,36 @@ service Query {
   // -----------------------------------------
   // Query clients for evm keeper statedb access
   rpc QueryGetHashStateDB(GetHashRequest) returns (GetHashResponse) {
-    option (google.api.http).get = "/ethermint/evm/v1/get_hash";
   }
   
   rpc PostAddBalanceStateDB(AddBalanceRequest) returns (AddBalanceResponse) {
-    option (google.api.http).post = "/ethermint/evm/v1/add_balance";
   }
   
   rpc PostSubBalanceStateDB(SubBalanceRequest) returns (SubBalanceResponse) {
-    option (google.api.http).post = "/ethermint/evm/v1/sub_balance";
   }
 
   rpc QueryGetBalanceStateDB(GetBalanceRequest) returns (GetBalanceResponse) {
-    option (google.api.http).get = "/ethermint/evm/v1/get_balance";
   }
 
   rpc QueryGetAccountStateDB(GetAccountRequest) returns (GetAccountResponse) {
-    option (google.api.http).get = "/ethermint/evm/v1/get_account";
   }
 
   rpc QueryGetStateStateDB(GetStateRequest) returns (GetStateResponse) {
-    option (google.api.http).get = "/ethermint/evm/v1/get_state";
   }
 
   rpc QueryGetCodeStateDB(GetCodeRequest) returns (GetCodeResponse) {
-    option (google.api.http).get = "/ethermint/evm/v1/get_code";
   }
 
   rpc PostSetAccountStateDB(SetAccountRequest) returns (SetAccountResponse) {
-    option (google.api.http).post = "/ethermint/evm/v1/set_account";
   }
 
   rpc PostSetStateStateDB(SetStateRequest) returns (SetStateResponse) {
-    option (google.api.http).post = "/ethermint/evm/v1/set_state";
   }
 
   rpc PostSetCodeStateDB(SetCodeRequest) returns (SetCodeResponse) {
-    option (google.api.http).post = "/ethermint/evm/v1/set_code";
   }
 
   rpc PostDeleteAccountStateDB(DeleteAccountRequest) returns (DeleteAccountResponse) {
-    option (google.api.http).post = "/ethermint/evm/v1/delete_account";
   }
 }
 
