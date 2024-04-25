@@ -60,7 +60,8 @@ message PrepareTxRequest {
   // will be executed.
   tendermint.types.Header header = 2[(gogoproto.nullable) = false]; // Header cmtproto.Header
   // Msg is the EVM transaction message to run on the EVM.
-  Message msg = 3[(gogoproto.nullable) = false]; // Msg core.Message
+  // Original type: core.Message
+  bytes msg = 3; 
   // EvmConfig is the EVM configuration to set.
   PrepareTxEVMConfig evm_config = 4[(gogoproto.nullable) = false]; // EvmConfig PrepareTxEVMConfig
 }
@@ -206,7 +207,8 @@ message StateDBPrepareRequest {
   bytes coinbase       = 3;
   // Original data type: common.Address
   bytes dest           = 4;
-  Rules rules         = 5;
+  // Original type: params.Rules
+  bytes rules         = 5;
   repeated AccessTuple access_list = 6;
 }
 
@@ -236,9 +238,11 @@ message Message {
 	bytes to          = 1;
   // Original type: common.Address
 	bytes from        = 2;
+  // Original type: uint64
 	uint64 nonce      = 3;
-  // *big.Int
+  // Original type: *big.Int
 	uint64 value      = 4;
+  // Original type: uint64
 	uint64 gas_limit  = 5;    
   // Original type: *big.Int
 	uint64 gas_price  = 6;
@@ -246,6 +250,7 @@ message Message {
 	uint64 gas_fee_cap = 7;
   // Original type: *big.Int
 	uint64 gas_tip_cap = 8;
+  // Original type: []byte
 	bytes data        = 9;
   // Original types: AccessList
   repeated AccessTuple access_list  = 10 [(gogoproto.nullable) = false];
@@ -256,6 +261,7 @@ message Message {
 	// When SkipAccountChecks is true, the message nonce is not checked against the
 	// account nonce in state. It also disables checking that the sender is an EOA.
 	// This field will be set to true for operations like RPC eth_call.
+  // Original type: bool
 	bool skip_account_checks          = 13;
 }
 
@@ -264,7 +270,8 @@ message PrepareTxEVMConfig {
 	// underlying params.ChainConfig struct contains pointer fields, they are
 	// not serializable over RPC with gob. Instead, the JSON representation is
 	// used.
-	ChainConfig chain_config_json = 1[(gogoproto.nullable) = false];
+  // Original type: params.ChainConfig
+	bytes chain_config_json = 1;
 	// Fields from EVMConfig
 	// Original type: common.Address
 	bytes coin_base            = 2;
@@ -272,79 +279,89 @@ message PrepareTxEVMConfig {
 	uint64 base_fee            = 3;
 	// Original type: statedb.TxConfig
 	TxConfig tx_config         = 4[(gogoproto.nullable) = false];
+  // Original type: bool
 	bool debug_trace           = 5;
 	// Fields from EVMConfig.FeeMarketParams struct
+  // Original type: bool
 	bool no_base_fee            = 6;
 	// Fields from EVMConfig.Params struct
+  // Original type: string
 	string evm_denom           = 7;
+  // Original type: []int64
 	repeated int64 extra_eips  = 8;
-	// *rpctypes.StateOverride : original type
+  // type StateOverride map[common.Address]OverrideAccount
+  // Original type: *rpctypes.StateOverride
 	bytes overrides = 9;
 }
 
 message ChainConfig {
-  // *big.Int
+  // Original type:*big.Int
 	uint64 chain_i_d = 1; // chainId identifies the current chain and is used for replay protection
-  // *big.Int
+  // Original type: *big.Int
 	uint64 homestead_block  = 2; // Homestead switch block (nil = no fork, 0 = already homestead)
 
-  // *big.Int
+  // Original type: *big.Int
 	uint64 d_a_o_fork_block  = 3;  // TheDAO hard-fork switch block (nil = no fork)
-	bool d_a_o_fork_support = 4; // Whether the nodes supports or opposes the DAO hard-fork
+	// Original type: bool
+  bool d_a_o_fork_support = 4; // Whether the nodes supports or opposes the DAO hard-fork
 
 	// EIP150 implements the Gas price changes (https://github.com/ethereum/EIPs/issues/150)
-  // *big.Int
+  // Original type: *big.Int
 	uint64 e_i_p_150_block = 5; // EIP150 HF block (nil = no fork)
-  // *big.Int
+  // Original type: *big.Int
 	uint64 e_i_p155_block = 6; // EIP155 HF block
-  // *big.Int 
+  // Original type: *big.Int 
 	uint64 e_i_p158_block = 7; // EIP158 HF block
 
-  // *big.Int
+  // Original type: *big.Int
 	uint64 byzantium_block = 8; // Byzantium switch block (nil = no fork, 0 = already on byzantium)
-  // *big.Int
+  // Original type: *big.Int
 	uint64 constantinople_block = 9; // Constantinople switch block (nil = no fork, 0 = already activated)
-  // *big.Int 
+  // Original type: *big.Int 
 	uint64 petersburg_block = 10;     // Petersburg switch block (nil = same as Constantinople)
-  // *big.Int
+  // Original type: *big.Int
 	uint64 istanbul_block = 11;       // Istanbul switch block (nil = no fork, 0 = already on istanbul)
-  // *big.Int
+  // Original type: *big.Int
 	uint64 muir_glacier_block = 12;    // Eip-2384 (bomb delay) switch block (nil = no fork, 0 = already activated)
-  // *big.Int
+  // Original type: *big.Int
 	uint64 berlin_block = 13;         // Berlin switch block (nil = no fork, 0 = already on berlin)
-  // *big.Int
+  // Original type: *big.Int
 	uint64 london_block = 14;         // London switch block (nil = no fork, 0 = already on london)
-  // *big.Int
+  // Original type: *big.Int
 	uint64 arrow_glacier_block = 15;   // Eip-4345 (bomb delay) switch block (nil = no fork, 0 = already activated)
-	// *big.Int
+	// Original type: *big.Int
   uint64 gray_glacier_block = 16;    // Eip-5133 (bomb delay) switch block (nil = no fork, 0 = already activated)
-	// *big.Int
+	// Original type: *big.Int
   uint64 merge_netsplit_block = 17;  // Virtual fork after The Merge to use as a network splitter
 
 	// Fork scheduling was switched from blocks to timestamps here
 
-  // *uint64
+  // Original type: *uint64
 	uint64 shanghai_time = 18[(gogoproto.nullable) = true]; // Shanghai switch time (nil = no fork, 0 = already on shanghai)
-  // *uint64
+  // Original type: *uint64
 	uint64 cancun_time   = 19[(gogoproto.nullable) = true];   // Cancun switch time (nil = no fork, 0 = already on cancun)
-  // *uint64
+  // Original type: *uint64
 	uint64 prague_time   = 20[(gogoproto.nullable) = true];   // Prague switch time (nil = no fork, 0 = already on prague)
-  // *uint64
+  // Original type: *uint64
 	uint64 verkle_time   = 21[(gogoproto.nullable) = true];   // Verkle switch time (nil = no fork, 0 = already on verkle)
 
 	// TerminalTotalDifficulty is the amount of total difficulty reached by
 	// the network that triggers the consensus upgrade.
-	// *big.Int 
+	// Original type: *big.Int 
 	uint64 terminal_total_difficulty = 22;
 
 	// TerminalTotalDifficultyPassed is a flag specifying that the network already
 	// passed the terminal total difficulty. Its purpose is to disable legacy sync
 	// even without having seen the TTD locally (safer long term).
+  // Original type: bool
 	bool terminal_total_difficulty_passed = 23;
 
 	// Various consensus engines
+  // Original type: params.EthashConfig
 	EthashConfig ethash = 24;
+  // Original type: params.CliqueConfig
 	CliqueConfig clique = 25;
+  // Original type: bool
 	bool is_dev_mode = 26;
 }
 
@@ -352,7 +369,9 @@ message EthashConfig {}
 
 // CliqueConfig is the consensus engine configs for proof-of-authority based sealing.
 message CliqueConfig {
+  // Original type: uint64
 	uint64 Period = 1; // Number of seconds between blocks to enforce
+  // Original type: uint64
 	uint64 Epoch = 2;  // Epoch length to reset votes and checkpoint
 }
 
@@ -362,7 +381,9 @@ message TxConfig {
 	bytes block_hash  = 1; // hash of current block
 	// Original type: common.Hash 
 	bytes tx_hash     = 2; // hash of current tx
+  // Original type: int64
 	uint64 tx_index   = 3; // the index of current transaction
+  // Original type: int64
 	uint64 log_index  = 4; // the index of next log within current block
 }
 

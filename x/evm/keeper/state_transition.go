@@ -410,29 +410,16 @@ func (k *Keeper) ApplyMessageWithConfig(
 
 	// Ethermint original code:
 	// stateDB.Prepare(rules, msg.From, cfg.CoinBase, msg.To, vm.ActivePrecompiles(rules), msg.AccessList)
+	sgxRules, err := json.Marshal(rules)
+	if err != nil {
+		return nil, errorsmod.Wrap(err, "rule marshall failure")
+	}
 	dbPrepareReq := &sgxtypes.StateDBPrepareRequest{
-		HandlerId: handlerId,
-		Sender:    msg.From.Bytes(),
-		Coinbase:  cfg.CoinBase.Bytes(),
-		Dest:      k.SafeAddress2Bytes(msg.To),
-		Rules: &sgxtypes.Rules{
-			ChainId:          rules.ChainID.Uint64(),
-			IsHomestead:      rules.IsHomestead,
-			IsEIP150:         rules.IsEIP150,
-			IsEIP155:         rules.IsEIP155,
-			IsEIP158:         rules.IsEIP158,
-			IsByzantium:      rules.IsByzantium,
-			IsConstantinople: rules.IsConstantinople,
-			IsPetersburg:     rules.IsPetersburg,
-			IsIstanbul:       rules.IsIstanbul,
-			IsBerlin:         rules.IsBerlin,
-			IsLondon:         rules.IsLondon,
-			IsMerge:          rules.IsMerge,
-			IsShanghai:       rules.IsShanghai,
-			IsCancun:         rules.IsCancun,
-			IsPrague:         rules.IsPrague,
-			IsVerkle:         rules.IsVerkle,
-		},
+		HandlerId:  handlerId,
+		Sender:     msg.From.Bytes(),
+		Coinbase:   cfg.CoinBase.Bytes(),
+		Dest:       k.SafeAddress2Bytes(msg.To),
+		Rules:      sgxRules,
 		AccessList: make([]*sgxtypes.AccessTuple, 0),
 	}
 
@@ -467,7 +454,11 @@ func (k *Keeper) ApplyMessageWithConfig(
 
 		// Ethermint original code:
 		// stateDB.SetNonce(sender.Address(), msg.Nonce)
-		_, err := sgxGrpcClient.StateDBSetNonce(ctx, &sgxtypes.StateDBSetNonceRequest{HandlerId: handlerId, Caller: msg.From.Bytes(), Nonce: msg.Nonce})
+		_, err := sgxGrpcClient.StateDBSetNonce(ctx, &sgxtypes.StateDBSetNonceRequest{
+			HandlerId: handlerId,
+			Caller:    msg.From.Bytes(),
+			Nonce:     msg.Nonce,
+		})
 		if err != nil {
 			// panic cosmos if sgx isn't available.
 			if k.IsSgxDownError(err) {
@@ -479,7 +470,13 @@ func (k *Keeper) ApplyMessageWithConfig(
 
 		// Ethermint original code:
 		// ret, _, leftoverGas, vmErr = evm.Create(sender, msg.Data, leftoverGas, msg.Value)
-		resp, vmErr := sgxGrpcClient.Create(ctx, &sgxtypes.CreateRequest{HandlerId: handlerId, Caller: msg.From.Bytes(), Code: msg.Data, Gas: leftoverGas, Value: msg.Value.Uint64()})
+		resp, vmErr := sgxGrpcClient.Create(ctx, &sgxtypes.CreateRequest{
+			HandlerId: handlerId,
+			Caller:    msg.From.Bytes(),
+			Code:      msg.Data,
+			Gas:       leftoverGas,
+			Value:     msg.Value.Uint64(),
+		})
 		if vmErr != nil {
 			// panic cosmos if sgx isn't available.
 			if k.IsSgxDownError(vmErr) {
@@ -494,7 +491,11 @@ func (k *Keeper) ApplyMessageWithConfig(
 
 		// Ethermint original code:
 		// stateDB.SetNonce(sender.Address(), msg.Nonce+1)
-		_, vmErr = sgxGrpcClient.StateDBSetNonce(ctx, &sgxtypes.StateDBSetNonceRequest{HandlerId: handlerId, Caller: msg.From.Bytes(), Nonce: msg.Nonce + 1})
+		_, vmErr = sgxGrpcClient.StateDBSetNonce(ctx, &sgxtypes.StateDBSetNonceRequest{
+			HandlerId: handlerId,
+			Caller:    msg.From.Bytes(),
+			Nonce:     msg.Nonce + 1,
+		})
 		if vmErr != nil {
 			// panic cosmos if sgx isn't available.
 			if k.IsSgxDownError(vmErr) {
@@ -506,7 +507,14 @@ func (k *Keeper) ApplyMessageWithConfig(
 	} else {
 		// Ethermint original code:
 		// ret, leftoverGas, vmErr = evm.Call(sender, *msg.To, msg.Data, leftoverGas, msg.Value)
-		resp, vmErr := sgxGrpcClient.Call(ctx, &sgxtypes.CallRequest{HandlerId: handlerId, Caller: msg.From.Bytes(), Addr: k.SafeAddress2Bytes(msg.To), Input: msg.Data, Gas: leftoverGas, Value: msg.Value.Uint64()})
+		resp, vmErr := sgxGrpcClient.Call(ctx, &sgxtypes.CallRequest{
+			HandlerId: handlerId,
+			Caller:    msg.From.Bytes(),
+			Addr:      k.SafeAddress2Bytes(msg.To),
+			Input:     msg.Data,
+			Gas:       leftoverGas,
+			Value:     msg.Value.Uint64(),
+		})
 		if vmErr != nil {
 			// panic cosmos if sgx isn't available.
 			if k.IsSgxDownError(vmErr) {
@@ -536,7 +544,9 @@ func (k *Keeper) ApplyMessageWithConfig(
 
 	// Ethermint original code:
 	// leftoverGas += GasToRefund(stateDB.GetRefund(), temporaryGasUsed, refundQuotient)
-	resp, err := sgxGrpcClient.StateDBGetRefund(ctx, &sgxtypes.StateDBGetRefundRequest{HandlerId: handlerId})
+	resp, err := sgxGrpcClient.StateDBGetRefund(ctx, &sgxtypes.StateDBGetRefundRequest{
+		HandlerId: handlerId,
+	})
 	if err != nil {
 		// panic cosmos if sgx isn't available.
 		if k.IsSgxDownError(err) {
@@ -653,104 +663,11 @@ func (k *Keeper) SafeBigInt2Uint64Convert(val *big.Int) uint64 {
 	return val.Uint64()
 }
 
-func (k *Keeper) ChainConfigBitInt2Uint64(val *big.Int) uint64 {
-	if val == nil {
-		return 99999
-	}
-	return val.Uint64()
-}
-
 func (k *Keeper) SafeAddress2Bytes(addr *common.Address) []byte {
 	if addr == nil {
 		return nil
 	}
 	return addr.Bytes()
-}
-
-func (k *Keeper) prepareSgxChainConfig(cfg *EVMConfig) sgxtypes.ChainConfig {
-	chainConfig := cfg.ChainConfig
-	sgxChainConfig := sgxtypes.ChainConfig{
-		// *big.Int
-		ChainID: k.SafeBigInt2Uint64Convert(chainConfig.ChainID),
-		// *big.Int
-		HomesteadBlock: k.ChainConfigBitInt2Uint64(chainConfig.HomesteadBlock),
-		// *big.Int
-		DAOForkBlock:   k.ChainConfigBitInt2Uint64(chainConfig.DAOForkBlock),
-		DAOForkSupport: chainConfig.DAOForkSupport,
-		// EIP150 implements the Gas price changes (https://github.com/ethereum/EIPs/issues/150)
-		// *big.Int
-		EIP_150Block: k.ChainConfigBitInt2Uint64(chainConfig.EIP150Block),
-		// *big.Int
-		EIP155Block: k.ChainConfigBitInt2Uint64(chainConfig.EIP155Block),
-		// *big.Int
-		EIP158Block: k.ChainConfigBitInt2Uint64(chainConfig.EIP158Block),
-		// *big.Int
-		ByzantiumBlock: k.ChainConfigBitInt2Uint64(chainConfig.ByzantiumBlock),
-		// *big.Int
-		ConstantinopleBlock: k.ChainConfigBitInt2Uint64(chainConfig.ConstantinopleBlock),
-		// *big.Int
-		PetersburgBlock: k.ChainConfigBitInt2Uint64(chainConfig.PetersburgBlock),
-		// *big.Int
-		IstanbulBlock: k.ChainConfigBitInt2Uint64(chainConfig.IstanbulBlock),
-		// *big.Int
-		MuirGlacierBlock: k.ChainConfigBitInt2Uint64(chainConfig.MuirGlacierBlock),
-		// *big.Int
-		BerlinBlock: k.ChainConfigBitInt2Uint64(chainConfig.BerlinBlock),
-		// *big.Int
-		LondonBlock: k.ChainConfigBitInt2Uint64(chainConfig.LondonBlock),
-		// *big.Int
-		ArrowGlacierBlock: k.ChainConfigBitInt2Uint64(chainConfig.ArrowGlacierBlock),
-		// *big.Int
-		GrayGlacierBlock: k.ChainConfigBitInt2Uint64(chainConfig.GrayGlacierBlock),
-		// *big.Int
-		MergeNetsplitBlock: k.ChainConfigBitInt2Uint64(chainConfig.MergeNetsplitBlock),
-
-		// TerminalTotalDifficulty is the amount of total difficulty reached by
-		// the network that triggers the consensus upgrade.
-		// *big.Int
-		TerminalTotalDifficulty: k.SafeBigInt2Uint64Convert(chainConfig.TerminalTotalDifficulty),
-		// TerminalTotalDifficultyPassed is a flag specifying that the network already
-		// passed the terminal total difficulty. Its purpose is to disable legacy sync
-		// even without having seen the TTD locally (safer long term).
-		TerminalTotalDifficultyPassed: chainConfig.TerminalTotalDifficultyPassed,
-		// Various consensus engines
-		Ethash:       nil,
-		Clique:       nil,
-		IsDevMode:    chainConfig.IsDevMode,
-		ShanghaiTime: 100000,
-		CancunTime:   100000,
-		PragueTime:   100000,
-		VerkleTime:   100000,
-	}
-
-	if chainConfig.Ethash != nil {
-		sgxChainConfig.Ethash = &sgxtypes.EthashConfig{}
-	}
-
-	if chainConfig.Clique != nil {
-		sgxChainConfig.Clique = &sgxtypes.CliqueConfig{
-			Period: chainConfig.Clique.Period,
-			Epoch:  chainConfig.Clique.Epoch,
-		}
-	}
-
-	if chainConfig.ShanghaiTime != nil {
-		sgxChainConfig.ShanghaiTime = *chainConfig.ShanghaiTime
-	}
-
-	if chainConfig.CancunTime != nil {
-		sgxChainConfig.CancunTime = *chainConfig.CancunTime
-	}
-
-	if chainConfig.PragueTime != nil {
-		sgxChainConfig.PragueTime = *chainConfig.PragueTime
-	}
-
-	if chainConfig.VerkleTime != nil {
-		sgxChainConfig.VerkleTime = *chainConfig.VerkleTime
-	}
-
-	return sgxChainConfig
 }
 
 // prepareTxForSgx prepares the transaction for the SGX enclave. It:
@@ -760,10 +677,12 @@ func (k *Keeper) prepareSgxChainConfig(cfg *EVMConfig) sgxtypes.ChainConfig {
 //     block info
 func (k *Keeper) prepareTxForSgx(ctx sdk.Context, msg core.Message, cfg *EVMConfig, sgxGrpcClient sgxtypes.QueryServiceClient) (uint64, error) {
 	// Step 1. Send a "PrepareTx" request to the SGX enclave.
-	chainConfig := k.prepareSgxChainConfig(cfg)
+	chainConfig, err := json.Marshal(cfg.ChainConfig)
+	if err != nil {
+		return 0, err
+	}
 
 	var overrides []byte
-	var err error
 	if cfg.Overrides != nil {
 		overrides, err = json.Marshal(cfg.Overrides)
 		if err != nil {
@@ -792,56 +711,10 @@ func (k *Keeper) prepareTxForSgx(ctx sdk.Context, msg core.Message, cfg *EVMConf
 
 	evmConfig.TxConfig = txConfig
 
-	// core.Message
-	sgxMsg := sgxtypes.Message{
-		// Original type: *common.Address
-		To: k.SafeAddress2Bytes(msg.To),
-		// Original type: common.Address
-		From:  msg.From.Bytes(),
-		Nonce: msg.Nonce,
-		// *big.Int
-		Value:    k.SafeBigInt2Uint64Convert(msg.Value),
-		GasLimit: msg.GasLimit,
-		// Original type: *big.Int
-		GasPrice: k.SafeBigInt2Uint64Convert(msg.GasPrice),
-		// Original type: *big.Int
-		GasFeeCap: k.SafeBigInt2Uint64Convert(msg.GasFeeCap),
-		// Original type: *big.Int
-		GasTipCap: k.SafeBigInt2Uint64Convert(msg.GasTipCap),
-		Data:      msg.Data,
-		// Original types: AccessList
-		// Original type:  *big.Int
-		BlobGasFeeCap: k.SafeBigInt2Uint64Convert(msg.BlobGasFeeCap),
-		// Original type: []common.Hash
-		// When SkipAccountChecks is true, the message nonce is not checked against the
-		// account nonce in state. It also disables checking that the sender is an EOA.
-		// This field will be set to true for operations like RPC eth_call.
-		SkipAccountChecks: msg.SkipAccountChecks,
+	sgxMsg, err := json.Marshal(msg)
+	if err != nil {
+		return 0, err
 	}
-
-	// AccessList{}
-	accessList := make([]sgxtypes.AccessTuple, 0)
-	for _, accList := range msg.AccessList {
-		storageKeys := make([][]byte, 0)
-		if accList.StorageKeys != nil && len(accList.StorageKeys) > 0 {
-			for _, storageKey := range accList.StorageKeys {
-				storageKeys = append(storageKeys, storageKey.Bytes())
-			}
-		}
-
-		accessList = append(accessList, sgxtypes.AccessTuple{
-			Address:     accList.Address.Bytes(),
-			StorageKeys: storageKeys,
-		})
-	}
-
-	blobHashes := make([][]byte, 0)
-	for _, hashes := range msg.BlobHashes {
-		blobHashes = append(blobHashes, hashes.Bytes())
-	}
-
-	sgxMsg.AccessList = accessList
-	sgxMsg.BlobHashes = blobHashes
 
 	resp, err := sgxGrpcClient.PrepareTx(ctx, &sgxtypes.PrepareTxRequest{TxHash: cfg.TxConfig.TxHash.Bytes(), Header: ctx.BlockHeader(), Msg: sgxMsg, EvmConfig: evmConfig})
 	if err != nil {

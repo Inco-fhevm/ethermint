@@ -944,6 +944,6 @@ func (k Keeper) PostDeleteAccountStateDB(_ context.Context, req *types.DeleteAcc
 
 	addr := common.HexToAddress(req.Addr)
 
-	k.DeleteAccount(*ctx, addr)
-	return &types.DeleteAccountResponse{}, nil
+	err := k.DeleteAccount(*ctx, addr)
+	return &types.DeleteAccountResponse{}, err
 }
