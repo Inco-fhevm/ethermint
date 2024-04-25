@@ -428,7 +428,7 @@ func (k *Keeper) ApplyMessageWithConfig(
 			IsBerlin:         rules.IsBerlin,
 			IsLondon:         rules.IsLondon,
 			IsMerge:          rules.IsMerge,
-			IsShanghai:       rules.IsMerge,
+			IsShanghai:       rules.IsShanghai,
 			IsCancun:         rules.IsCancun,
 			IsPrague:         rules.IsPrague,
 			IsVerkle:         rules.IsVerkle,
@@ -480,14 +480,17 @@ func (k *Keeper) ApplyMessageWithConfig(
 		// Ethermint original code:
 		// ret, _, leftoverGas, vmErr = evm.Create(sender, msg.Data, leftoverGas, msg.Value)
 		resp, vmErr := sgxGrpcClient.Create(ctx, &sgxtypes.CreateRequest{HandlerId: handlerId, Caller: msg.From.Bytes(), Code: msg.Data, Gas: leftoverGas, Value: msg.Value.Uint64()})
-		ret = resp.Ret
-		leftoverGas = resp.LeftOverGas
 		if vmErr != nil {
 			// panic cosmos if sgx isn't available.
 			if k.IsSgxDownError(vmErr) {
 				panic("sgx rpc server is down")
 			}
+
+			return nil, vmErr
 		}
+
+		ret = resp.Ret
+		leftoverGas = resp.LeftOverGas
 
 		// Ethermint original code:
 		// stateDB.SetNonce(sender.Address(), msg.Nonce+1)
@@ -497,14 +500,13 @@ func (k *Keeper) ApplyMessageWithConfig(
 			if k.IsSgxDownError(vmErr) {
 				panic("sgx rpc server is down")
 			}
+
+			return nil, vmErr
 		}
 	} else {
 		// Ethermint original code:
 		// ret, leftoverGas, vmErr = evm.Call(sender, *msg.To, msg.Data, leftoverGas, msg.Value)
 		resp, vmErr := sgxGrpcClient.Call(ctx, &sgxtypes.CallRequest{HandlerId: handlerId, Caller: msg.From.Bytes(), Addr: k.SafeAddress2Bytes(msg.To), Input: msg.Data, Gas: leftoverGas, Value: msg.Value.Uint64()})
-		ret = resp.Ret
-		leftoverGas = resp.LeftOverGas
-
 		if vmErr != nil {
 			// panic cosmos if sgx isn't available.
 			if k.IsSgxDownError(vmErr) {
@@ -513,6 +515,8 @@ func (k *Keeper) ApplyMessageWithConfig(
 
 			return nil, vmErr
 		}
+		ret = resp.Ret
+		leftoverGas = resp.LeftOverGas
 	}
 
 	refundQuotient := params.RefundQuotient
@@ -649,6 +653,13 @@ func (k *Keeper) SafeBigInt2Uint64Convert(val *big.Int) uint64 {
 	return val.Uint64()
 }
 
+func (k *Keeper) ChainConfigBitInt2Uint64(val *big.Int) uint64 {
+	if val == nil {
+		return 99999
+	}
+	return val.Uint64()
+}
+
 func (k *Keeper) SafeAddress2Bytes(addr *common.Address) []byte {
 	if addr == nil {
 		return nil
@@ -662,37 +673,37 @@ func (k *Keeper) prepareSgxChainConfig(cfg *EVMConfig) sgxtypes.ChainConfig {
 		// *big.Int
 		ChainID: k.SafeBigInt2Uint64Convert(chainConfig.ChainID),
 		// *big.Int
-		HomesteadBlock: k.SafeBigInt2Uint64Convert(chainConfig.HomesteadBlock),
+		HomesteadBlock: k.ChainConfigBitInt2Uint64(chainConfig.HomesteadBlock),
 		// *big.Int
-		DAOForkBlock:   k.SafeBigInt2Uint64Convert(chainConfig.DAOForkBlock),
+		DAOForkBlock:   k.ChainConfigBitInt2Uint64(chainConfig.DAOForkBlock),
 		DAOForkSupport: chainConfig.DAOForkSupport,
 		// EIP150 implements the Gas price changes (https://github.com/ethereum/EIPs/issues/150)
 		// *big.Int
-		EIP_150Block: k.SafeBigInt2Uint64Convert(chainConfig.EIP150Block),
+		EIP_150Block: k.ChainConfigBitInt2Uint64(chainConfig.EIP150Block),
 		// *big.Int
-		EIP155Block: k.SafeBigInt2Uint64Convert(chainConfig.EIP155Block),
+		EIP155Block: k.ChainConfigBitInt2Uint64(chainConfig.EIP155Block),
 		// *big.Int
-		EIP158Block: k.SafeBigInt2Uint64Convert(chainConfig.EIP158Block),
+		EIP158Block: k.ChainConfigBitInt2Uint64(chainConfig.EIP158Block),
 		// *big.Int
-		ByzantiumBlock: k.SafeBigInt2Uint64Convert(chainConfig.ByzantiumBlock),
+		ByzantiumBlock: k.ChainConfigBitInt2Uint64(chainConfig.ByzantiumBlock),
 		// *big.Int
-		ConstantinopleBlock: k.SafeBigInt2Uint64Convert(chainConfig.ConstantinopleBlock),
+		ConstantinopleBlock: k.ChainConfigBitInt2Uint64(chainConfig.ConstantinopleBlock),
 		// *big.Int
-		PetersburgBlock: k.SafeBigInt2Uint64Convert(chainConfig.PetersburgBlock),
+		PetersburgBlock: k.ChainConfigBitInt2Uint64(chainConfig.PetersburgBlock),
 		// *big.Int
-		IstanbulBlock: k.SafeBigInt2Uint64Convert(chainConfig.IstanbulBlock),
+		IstanbulBlock: k.ChainConfigBitInt2Uint64(chainConfig.IstanbulBlock),
 		// *big.Int
-		MuirGlacierBlock: k.SafeBigInt2Uint64Convert(chainConfig.MuirGlacierBlock),
+		MuirGlacierBlock: k.ChainConfigBitInt2Uint64(chainConfig.MuirGlacierBlock),
 		// *big.Int
-		BerlinBlock: k.SafeBigInt2Uint64Convert(chainConfig.BerlinBlock),
+		BerlinBlock: k.ChainConfigBitInt2Uint64(chainConfig.BerlinBlock),
 		// *big.Int
-		LondonBlock: k.SafeBigInt2Uint64Convert(chainConfig.LondonBlock),
+		LondonBlock: k.ChainConfigBitInt2Uint64(chainConfig.LondonBlock),
 		// *big.Int
-		ArrowGlacierBlock: k.SafeBigInt2Uint64Convert(chainConfig.ArrowGlacierBlock),
+		ArrowGlacierBlock: k.ChainConfigBitInt2Uint64(chainConfig.ArrowGlacierBlock),
 		// *big.Int
-		GrayGlacierBlock: k.SafeBigInt2Uint64Convert(chainConfig.GrayGlacierBlock),
+		GrayGlacierBlock: k.ChainConfigBitInt2Uint64(chainConfig.GrayGlacierBlock),
 		// *big.Int
-		MergeNetsplitBlock: k.SafeBigInt2Uint64Convert(chainConfig.MergeNetsplitBlock),
+		MergeNetsplitBlock: k.ChainConfigBitInt2Uint64(chainConfig.MergeNetsplitBlock),
 
 		// TerminalTotalDifficulty is the amount of total difficulty reached by
 		// the network that triggers the consensus upgrade.
@@ -703,8 +714,17 @@ func (k *Keeper) prepareSgxChainConfig(cfg *EVMConfig) sgxtypes.ChainConfig {
 		// even without having seen the TTD locally (safer long term).
 		TerminalTotalDifficultyPassed: chainConfig.TerminalTotalDifficultyPassed,
 		// Various consensus engines
-		Ethash:    &sgxtypes.EthashConfig{},
-		IsDevMode: chainConfig.IsDevMode,
+		Ethash:       nil,
+		Clique:       nil,
+		IsDevMode:    chainConfig.IsDevMode,
+		ShanghaiTime: 100000,
+		CancunTime:   100000,
+		PragueTime:   100000,
+		VerkleTime:   100000,
+	}
+
+	if chainConfig.Ethash != nil {
+		sgxChainConfig.Ethash = &sgxtypes.EthashConfig{}
 	}
 
 	if chainConfig.Clique != nil {
@@ -750,8 +770,6 @@ func (k *Keeper) prepareTxForSgx(ctx sdk.Context, msg core.Message, cfg *EVMConf
 			return 0, err
 		}
 	}
-
-	ctx.HeaderHash()
 
 	// Prepare EvmConfig
 	evmConfig := sgxtypes.PrepareTxEVMConfig{

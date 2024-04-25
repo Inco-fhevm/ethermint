@@ -344,23 +344,22 @@ func (k Keeper) EstimateGas(c context.Context, req *types.EthCallRequest) (*type
 
 	// NOTE: the errors from the executable below should be consistent with go-ethereum,
 	// so we don't wrap them with the gRPC status code
-
+	msg = core.Message{
+		From:              msg.From,
+		To:                msg.To,
+		Nonce:             msg.Nonce,
+		Value:             msg.Value,
+		GasPrice:          msg.GasPrice,
+		GasFeeCap:         msg.GasFeeCap,
+		GasTipCap:         msg.GasTipCap,
+		Data:              msg.Data,
+		AccessList:        msg.AccessList,
+		SkipAccountChecks: msg.SkipAccountChecks,
+	}
 	// Create a helper to check if a gas allowance results in an executable transaction
 	executable := func(gas uint64) (vmError bool, rsp *types.MsgEthereumTxResponse, err error) {
 		// update the message with the new gas value
-		msg = core.Message{
-			From:              msg.From,
-			To:                msg.To,
-			Nonce:             msg.Nonce,
-			Value:             msg.Value,
-			GasPrice:          msg.GasPrice,
-			GasLimit:          gas,
-			GasFeeCap:         msg.GasFeeCap,
-			GasTipCap:         msg.GasTipCap,
-			Data:              msg.Data,
-			AccessList:        msg.AccessList,
-			SkipAccountChecks: msg.SkipAccountChecks,
-		}
+		msg.GasLimit = gas
 		// pass false to not commit StateDB
 		rsp, err = k.ApplyMessageWithConfig(ctx, msg, cfg, false)
 		if err != nil {
