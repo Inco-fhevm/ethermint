@@ -3,72 +3,91 @@ syntax = "proto3";
 package ethermint.sgx.v1;
 
 import "tendermint/types/types.proto";
-import "gogoproto/gogo.proto";
 
-option go_package = "github.com/evmos/ethermint/x/sgx/types";
+option go_package = "github.com/evmos/ethermint/x/evm/sgx";
 
 // QueryService defines the gRPC querier service.
 service QueryService {
-  // func (s *SgxRpcServer) PrepareTx(args *keeper.PrepareTxArgs, reply *keeper.PrepareTxReply) error {
-  rpc PrepareTx(PrepareTxRequest) returns (PrepareTxResponse) {
-  }
-
-  // func (s *SgxRpcServer) Create(args *keeper.CreateArgs, reply *keeper.CreateReply) error {
-  rpc Create(CreateRequest) returns (CreateResponse) {
-  }
-
-  // func (s *SgxRpcServer) Call(args *keeper.CallArgs, reply *keeper.CallReply) error {
-  rpc Call(CallRequest) returns (CallResponse) {
-  }
-  
-  // func (s *SgxRpcServer) Commit(args *keeper.CommitArgs, reply *keeper.CommitReply) error {
-  rpc Commit(CommitRequest) returns (CommitResponse) {
-  }
-
-  // func (s *SgxRpcServer) StateDBAddBalance(args *keeper.StateDBAddBalanceArgs, reply *keeper.StateDBAddBalanceReply) error {
-  rpc StateDBAddBalance(StateDBAddBalanceRequest) returns (StateDBAddBalanceResponse) {
-  }
-
-  // func (s *SgxRpcServer) StateDBSubBalance(args *keeper.StateDBSubBalanceArgs, reply *keeper.StateDBSubBalanceReply) error {
-  rpc StateDBSubBalance(StateDBSubBalanceRequest) returns (StateDBSubBalanceResponse) {
-  }
-  
-  // func (s *SgxRpcServer) StateDBSetNonce(args *keeper.StateDBSetNonceArgs, reply *keeper.StateDBSetNonceReply) error {
-  rpc StateDBSetNonce(StateDBSetNonceRequest) returns (StateDBSetNonceResponse) {
-  }
-
-  // func (s *SgxRpcServer) StateDBIncreaseNonce(args *keeper.StateDBIncreaseNonceArgs, reply *keeper.StateDBIncreaseNonceReply) error {
-  rpc StateDBIncreaseNonce(StateDBIncreaseNonceRequest) returns (StateDBIncreaseNonceResponse) {
-  }
-
-  // func (s *SgxRpcServer) StateDBPrepare(args *keeper.StateDBPrepareArgs, reply *keeper.StateDBPrepareReply) error {
-  rpc StateDBPrepare(StateDBPrepareRequest) returns (StateDBPrepareResponse) {
-  }
-
-  // func (s *SgxRpcServer) StateDBGetRefund(args *keeper.StateDBGetRefundArgs, reply *keeper.StateDBGetRefundReply) error {
-  rpc StateDBGetRefund(StateDBGetRefundRequest) returns (StateDBGetRefundResponse) {
-  }
-
-  // func (s *SgxRpcServer) StateDBGetLogs(args *keeper.StateDBGetLogsArgs, reply *keeper.StateDBGetLogsReply) error {
-  rpc StateDBGetLogs(StateDBGetLogsRequest) returns (StateDBGetLogsResponse) {
-  }
+  rpc StartEVM(StartEVMRequest) returns (StartEVMResponse) {}
+  rpc Create(CreateRequest) returns (CreateResponse) {}
+  rpc Call(CallRequest) returns (CallResponse) {}
+  rpc Commit(CommitRequest) returns (CommitResponse) {}
+  rpc StateDBAddBalance(StateDBAddBalanceRequest) returns (StateDBAddBalanceResponse) {}
+  rpc StateDBSubBalance(StateDBSubBalanceRequest) returns (StateDBSubBalanceResponse) {}
+  rpc StateDBSetNonce(StateDBSetNonceRequest) returns (StateDBSetNonceResponse) {}
+  rpc StateDBIncreaseNonce(StateDBIncreaseNonceRequest) returns (StateDBIncreaseNonceResponse) {}
+  rpc StateDBPrepare(StateDBPrepareRequest) returns (StateDBPrepareResponse) {}
+  rpc StateDBGetRefund(StateDBGetRefundRequest) returns (StateDBGetRefundResponse) {}
+  rpc StateDBGetLogs(StateDBGetLogsRequest) returns (StateDBGetLogsResponse) {}
+  rpc StopEVM(StopEVMRequest) returns (StopEVMResponse) {}
 }
 
-message PrepareTxRequest {
-  bytes tx_hash = 1;
-  // Header is the Tendermint header of the block in which the transaction
+message StartEVMRequest {
+  // header is the Tendermint header of the block in which the transaction
   // will be executed.
-  tendermint.types.Header header = 2[(gogoproto.nullable) = false]; // Header cmtproto.Header
-  // Msg is the EVM transaction message to run on the EVM.
-  // Original type: core.Message
-  bytes msg = 3; 
+  tendermint.types.Header header = 2;  // Header cmtproto.Header
+  // msg is the EVM transaction message to run on the EVM.
+  // Because of nil pointers in Golang, we chose to use JSON bytes here instead
+  // of a separate Protobuf message.
+  //
+  // Original geth type: core.Message
+  bytes msg_json = 3;
   // EvmConfig is the EVM configuration to set.
-  PrepareTxEVMConfig evm_config = 4[(gogoproto.nullable) = false]; // EvmConfig PrepareTxEVMConfig
+  StartEVMConfig evm_config = 4;  // EvmConfig StartEVMConfig
 }
 
-message PrepareTxResponse {
+// StartEVMConfig is the EVM config that is passed to the SGX during the
+// StartEVM request.
+message StartEVMConfig {
+  // ChainConfig is the EVM chain configuration in JSON format. Since the
+  // underlying params.ChainConfig struct contains pointer fields, they are
+  // not serializable over RPC with gob. Instead, the JSON representation is
+  // used.
+  //
+  // Original type: params.ChainConfig
+  bytes chain_config_json = 1;
+  // Original type: common.Address
+  bytes coin_base = 2;
+  // Original type: *big.Int
+  string base_fee = 3;
+  // Original type: statedb.TxConfig
+  TxConfig tx_config = 4;
+  // Original type: bool
+  bool debug_trace = 5;
+  // Fields from EVMConfig.FeeMarketParams struct
+  // Original type: bool
+  bool no_base_fee = 6;
+  // Fields from EVMConfig.Params struct
+  // Original type: string
+  string evm_denom = 7;
+  // Original type: []int64
+  repeated int64 extra_eips = 8;
+  // overrides_json is the collection of overridden accounts. We chose to use
+  // JSON bytes instead of a separate Protobuf message because of nil pointers
+  // and the complexity of the original geth type.
+  //
+  // Original geth type: *rpctypes.StateOverride
+  bytes overrides_json = 9;
+}
+
+// TxConfig encapulates the readonly information of current tx for `StateDB`.
+message TxConfig {
+  // Original type:  common.Hash
+  bytes block_hash = 1;  // hash of current block
+  // tx_hash is the hash of current tx.
+  // Original type: common.Hash
+  bytes tx_hash = 2;
+  // tx_index is the index of current transaction
+  // Original type: int64
+  uint64 tx_index = 3;
+  // log_index is the index of next log within current block
+  // Original type: int64
+  uint64 log_index = 4;
+}
+
+message StartEVMResponse {
   // handler_id is the unique request ID that is given by the SGX binary.
-  uint64 handler_id  = 1;
+  uint64 handler_id = 1;
 }
 
 message CreateRequest {
@@ -76,37 +95,39 @@ message CreateRequest {
   uint64 handler_id = 1;
   // caller is the account that creates the contract.
   // Original data type: common.Address
-  bytes caller      = 2; 
-  bytes code        = 3;
-  uint64 gas        = 4;   
+  bytes caller = 2;
+  bytes code = 3;
+  uint64 gas = 4;
   // value is the amount of wei to send with the contract creation.
-  uint64 value      = 5;
+  uint64 value = 5;
 }
 
 message CreateResponse {
-  bytes ret            = 1;
+  // ret returns the result bytes of the contract creation.
+  bytes ret = 1;
   // Original data type: common.Address
-  bytes contract_addr  = 2;
-  uint64 left_over_gas = 3; 
+  bytes contract_addr = 2;
+  uint64 left_over_gas = 3;
 }
 
 message CallRequest {
   // handler_id is the unique request ID that is given by the SGX binary.
   uint64 handler_id = 1;
   // Original data type: vm.AccountRef
-  bytes caller      = 2;
+  bytes caller = 2;
   // Original data type: common.Address
-  bytes addr        = 3;
+  bytes addr = 3;
   // Original data type: []byte
-  bytes input       = 4;
-  uint64 gas        = 5;
+  bytes input = 4;
+  uint64 gas = 5;
   // Original data type: *big.Int
-  uint64 value      = 6;
+  uint64 value = 6;
 }
 
 message CallResponse {
-  bytes ret             = 1;
-  uint64 left_over_gas  = 2;
+  // ret returns the result bytes of the contract call.
+  bytes ret = 1;
+  uint64 left_over_gas = 2;
 }
 
 message CommitRequest {
@@ -114,77 +135,48 @@ message CommitRequest {
   uint64 handler_id = 1;
 }
 
-message CommitResponse {
-}
+message CommitResponse {}
 
 message StateDBAddBalanceRequest {
   // handler_id is the unique request ID that is given by the SGX binary.
-  uint64 handler_id       = 1;
+  uint64 handler_id = 1;
   // caller is the account to add balance too.
-  bytes caller            = 2;
-  // amount is the amount to add.
-  uint64 amount           = 3;
+  bytes caller = 2;
+  // amount is the amount to add, as a big.Int.
+  string amount = 3;
 }
 
-message StateDBAddBalanceResponse {
-}
+message StateDBAddBalanceResponse {}
 
 message StateDBSubBalanceRequest {
   // handler_id is the unique request ID that is given by the SGX binary.
   uint64 handler_id = 1;
   // caller is the account to substract balance from.
-  bytes caller      = 2;
-  // amount is the amount to substract.
-  uint64 amount     = 3;
+  bytes caller = 2;
+  // amount is the amount to substract, as a big.Int.
+  string amount = 3;
 }
 
-message StateDBSubBalanceResponse {
-}
+message StateDBSubBalanceResponse {}
 
 message StateDBSetNonceRequest {
   // handler_id is the unique request ID that is given by the SGX binary.
   uint64 handler_id = 1;
   // Original data type: vm.AccountRef
-  bytes caller      = 2;
-  uint64 nonce      = 3;
+  bytes caller = 2;
+  uint64 nonce = 3;
 }
 
-message StateDBSetNonceResponse {
-}
+message StateDBSetNonceResponse {}
 
 message StateDBIncreaseNonceRequest {
   // handler_id is the unique request ID that is given by the SGX binary.
   uint64 handler_id = 1;
   // Original data type: vm.AccountRef
-  bytes caller      = 2;
+  bytes caller = 2;
 }
 
-message StateDBIncreaseNonceResponse {
-}
-
-// Rules wraps ChainConfig and is merely syntactic sugar or can be used for functions
-// that do not have or require information about the block.
-//
-// It is taken from geth:
-// https://github.com/ethereum/go-ethereum/blob/v1.13.5/params/config.go#L848
-message Rules {
-  uint64 chain_id = 1;
-	bool is_homestead = 2;
-  bool is_e_i_p150 = 3;
-  bool is_e_i_p155 = 4;
-  bool is_e_i_p158 = 5;
-	bool is_byzantium = 6;
-  bool is_constantinople = 7;
-  bool is_petersburg = 8;
-  bool is_istanbul = 9;
-	bool is_berlin = 10;
-  bool is_london = 11;
-  bool is_merge = 12;
-  bool is_shanghai = 13;
-  bool is_cancun = 14;
-  bool is_prague = 15;
-  bool is_verkle = 16;
-}
+message StateDBIncreaseNonceResponse {}
 
 // AccessTuple is the element type of an access list.
 //
@@ -194,26 +186,33 @@ message AccessTuple {
   // Original data type: common.Address
   bytes address = 1;
   // Original data type: []common.Hash
-  repeated bytes storage_keys    = 2;
-
+  repeated bytes storage_keys = 2;
 }
 
 message StateDBPrepareRequest {
   // handler_id is the unique request ID that is given by the SGX binary.
   uint64 handler_id = 1;
   // Original data type: common.Address
-  bytes sender         = 2;
+  bytes sender = 2;
   // Original data type: common.Address
-  bytes coinbase       = 3;
+  bytes coinbase = 3;
   // Original data type: common.Address
-  bytes dest           = 4;
-  // Original type: params.Rules
-  bytes rules         = 5;
+  bytes dest = 4;
+  // rules_json represent the Rules that wrap ChainConfig and is merely
+  // syntactic sugar or can be used for functions that do not have or require
+  // information about the block.
+  //
+  // We chose to use JSON bytes instead of a separate Protobuf message because
+  // of nil pointers and the complexity of the original geth type.
+  //
+  // Original geth type: *params.Rules
+  bytes rules_json = 5;
+  // access_list is the list of storage keys that the transaction is allowed to
+  // access.
   repeated AccessTuple access_list = 6;
 }
 
-message StateDBPrepareResponse {
-}
+message StateDBPrepareResponse {}
 
 message StateDBGetRefundRequest {
   // handler_id is the unique request ID that is given by the SGX binary.
@@ -230,188 +229,17 @@ message StateDBGetLogsRequest {
 }
 
 message StateDBGetLogsResponse {
-  repeated EthLog log = 1; // []*ethtypes.Log
+  // logs are the logs of the execution. We chose to use
+  // JSON bytes instead of a separate Protobuf message because of nil pointers
+  // and the complexity of the original geth type.
+  //
+  // Original geth type: []*ethtypes.Log
+  repeated bytes logs = 1;
 }
 
-message Message {
-  // Original type: *common.Address
-	bytes to          = 1;
-  // Original type: common.Address
-	bytes from        = 2;
-  // Original type: uint64
-	uint64 nonce      = 3;
-  // Original type: *big.Int
-	uint64 value      = 4;
-  // Original type: uint64
-	uint64 gas_limit  = 5;    
-  // Original type: *big.Int
-	uint64 gas_price  = 6;
-  // Original type: *big.Int
-	uint64 gas_fee_cap = 7;
-  // Original type: *big.Int
-	uint64 gas_tip_cap = 8;
-  // Original type: []byte
-	bytes data        = 9;
-  // Original types: AccessList
-  repeated AccessTuple access_list  = 10 [(gogoproto.nullable) = false];
-  // Original type:  *big.Int
-	uint64 blob_gas_fee_cap           = 11;
-	// Original type: []common.Hash
-  repeated bytes blob_hashes        = 12;
-	// When SkipAccountChecks is true, the message nonce is not checked against the
-	// account nonce in state. It also disables checking that the sender is an EOA.
-	// This field will be set to true for operations like RPC eth_call.
-  // Original type: bool
-	bool skip_account_checks          = 13;
+message StopEVMRequest {
+  // handler_id is the unique request ID that is given by the SGX binary.
+  uint64 handler_id = 1;
 }
 
-message PrepareTxEVMConfig {
-	// ChainConfig is the EVM chain configuration in JSON format. Since the
-	// underlying params.ChainConfig struct contains pointer fields, they are
-	// not serializable over RPC with gob. Instead, the JSON representation is
-	// used.
-  // Original type: params.ChainConfig
-	bytes chain_config_json = 1;
-	// Fields from EVMConfig
-	// Original type: common.Address
-	bytes coin_base            = 2;
-	// Original type: *big.Int
-	uint64 base_fee            = 3;
-	// Original type: statedb.TxConfig
-	TxConfig tx_config         = 4[(gogoproto.nullable) = false];
-  // Original type: bool
-	bool debug_trace           = 5;
-	// Fields from EVMConfig.FeeMarketParams struct
-  // Original type: bool
-	bool no_base_fee            = 6;
-	// Fields from EVMConfig.Params struct
-  // Original type: string
-	string evm_denom           = 7;
-  // Original type: []int64
-	repeated int64 extra_eips  = 8;
-  // type StateOverride map[common.Address]OverrideAccount
-  // Original type: *rpctypes.StateOverride
-	bytes overrides = 9;
-}
-
-message ChainConfig {
-  // Original type:*big.Int
-	uint64 chain_i_d = 1; // chainId identifies the current chain and is used for replay protection
-  // Original type: *big.Int
-	uint64 homestead_block  = 2; // Homestead switch block (nil = no fork, 0 = already homestead)
-
-  // Original type: *big.Int
-	uint64 d_a_o_fork_block  = 3;  // TheDAO hard-fork switch block (nil = no fork)
-	// Original type: bool
-  bool d_a_o_fork_support = 4; // Whether the nodes supports or opposes the DAO hard-fork
-
-	// EIP150 implements the Gas price changes (https://github.com/ethereum/EIPs/issues/150)
-  // Original type: *big.Int
-	uint64 e_i_p_150_block = 5; // EIP150 HF block (nil = no fork)
-  // Original type: *big.Int
-	uint64 e_i_p155_block = 6; // EIP155 HF block
-  // Original type: *big.Int 
-	uint64 e_i_p158_block = 7; // EIP158 HF block
-
-  // Original type: *big.Int
-	uint64 byzantium_block = 8; // Byzantium switch block (nil = no fork, 0 = already on byzantium)
-  // Original type: *big.Int
-	uint64 constantinople_block = 9; // Constantinople switch block (nil = no fork, 0 = already activated)
-  // Original type: *big.Int 
-	uint64 petersburg_block = 10;     // Petersburg switch block (nil = same as Constantinople)
-  // Original type: *big.Int
-	uint64 istanbul_block = 11;       // Istanbul switch block (nil = no fork, 0 = already on istanbul)
-  // Original type: *big.Int
-	uint64 muir_glacier_block = 12;    // Eip-2384 (bomb delay) switch block (nil = no fork, 0 = already activated)
-  // Original type: *big.Int
-	uint64 berlin_block = 13;         // Berlin switch block (nil = no fork, 0 = already on berlin)
-  // Original type: *big.Int
-	uint64 london_block = 14;         // London switch block (nil = no fork, 0 = already on london)
-  // Original type: *big.Int
-	uint64 arrow_glacier_block = 15;   // Eip-4345 (bomb delay) switch block (nil = no fork, 0 = already activated)
-	// Original type: *big.Int
-  uint64 gray_glacier_block = 16;    // Eip-5133 (bomb delay) switch block (nil = no fork, 0 = already activated)
-	// Original type: *big.Int
-  uint64 merge_netsplit_block = 17;  // Virtual fork after The Merge to use as a network splitter
-
-	// Fork scheduling was switched from blocks to timestamps here
-
-  // Original type: *uint64
-	uint64 shanghai_time = 18[(gogoproto.nullable) = true]; // Shanghai switch time (nil = no fork, 0 = already on shanghai)
-  // Original type: *uint64
-	uint64 cancun_time   = 19[(gogoproto.nullable) = true];   // Cancun switch time (nil = no fork, 0 = already on cancun)
-  // Original type: *uint64
-	uint64 prague_time   = 20[(gogoproto.nullable) = true];   // Prague switch time (nil = no fork, 0 = already on prague)
-  // Original type: *uint64
-	uint64 verkle_time   = 21[(gogoproto.nullable) = true];   // Verkle switch time (nil = no fork, 0 = already on verkle)
-
-	// TerminalTotalDifficulty is the amount of total difficulty reached by
-	// the network that triggers the consensus upgrade.
-	// Original type: *big.Int 
-	uint64 terminal_total_difficulty = 22;
-
-	// TerminalTotalDifficultyPassed is a flag specifying that the network already
-	// passed the terminal total difficulty. Its purpose is to disable legacy sync
-	// even without having seen the TTD locally (safer long term).
-  // Original type: bool
-	bool terminal_total_difficulty_passed = 23;
-
-	// Various consensus engines
-  // Original type: params.EthashConfig
-	EthashConfig ethash = 24;
-  // Original type: params.CliqueConfig
-	CliqueConfig clique = 25;
-  // Original type: bool
-	bool is_dev_mode = 26;
-}
-
-message EthashConfig {}
-
-// CliqueConfig is the consensus engine configs for proof-of-authority based sealing.
-message CliqueConfig {
-  // Original type: uint64
-	uint64 Period = 1; // Number of seconds between blocks to enforce
-  // Original type: uint64
-	uint64 Epoch = 2;  // Epoch length to reset votes and checkpoint
-}
-
-// TxConfig encapulates the readonly information of current tx for `StateDB`.
-message TxConfig {
-	// Original type:  common.Hash 
-	bytes block_hash  = 1; // hash of current block
-	// Original type: common.Hash 
-	bytes tx_hash     = 2; // hash of current tx
-  // Original type: int64
-	uint64 tx_index   = 3; // the index of current transaction
-  // Original type: int64
-	uint64 log_index  = 4; // the index of next log within current block
-}
-
-message EthLog {
-	// Consensus fields:
-	// address of the contract that generated the event
-	// Original type: common.Address
-	bytes address = 1;
-	// list of topics provided by the contract.
-	// Original type: []common.Hash
-	repeated bytes topics = 2;
-	// supplied by the contract, usually ABI-encoded
-	bytes data = 3;
-	// Derived fields. These fields are filled in by the node
-	// but not secured by consensus.
-	// block in which the transaction was included
-	uint64 block_number = 4;
-	// hash of the transaction
-	bytes tx_hash = 5;
-	// index of the transaction in the block
-	uint64 tx_index = 6;
-	// hash of the block in which the transaction was included
-  // Original type: common.Hash
-	bytes block_hash = 7;
-	// index of the log in the block
-	uint64 index = 8;
-
-	// The Removed field is true if this log was reverted due to a chain reorganisation.
-	// You must pay attention to this field if you receive logs through a filter query.
-	bool removed = 9;
-}
+message StopEVMResponse {}

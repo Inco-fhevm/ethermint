@@ -39,7 +39,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
 
-	sgxtypes "github.com/evmos/ethermint/x/sgx/types"
+	"github.com/evmos/ethermint/x/evm/sgx"
 )
 
 // GetHashFn implements vm.GetHashFunc for Ethermint. It handles 3 cases:
@@ -313,9 +313,9 @@ func (k *Keeper) ApplyMessageWithConfig(
 		return nil, errorsmod.Wrap(err, "failed to connect to localhost:9092")
 	}
 
-	sgxGrpcClient := sgxtypes.NewQueryServiceClient(rpcConn)
+	sgxGrpcClient := sgx.NewQueryServiceClient(rpcConn)
 
-	handlerId, err := k.prepareTxForSgx(ctx, msg, cfg, sgxGrpcClient)
+	handlerId, err := k.startEVM(ctx, msg, cfg, sgxGrpcClient)
 	if err != nil {
 		return nil, errorsmod.Wrap(err, "failed to create new RPC server")
 	}
@@ -330,14 +330,14 @@ func (k *Keeper) ApplyMessageWithConfig(
 
 			// Ethermint original code:
 			// stateDB.SubBalance(sender.Address(), new(big.Int).Mul(msg.GasPrice, new(big.Int).SetUint64(msg.GasLimit)))
-			_, err := sgxGrpcClient.StateDBSubBalance(ctx, &sgxtypes.StateDBSubBalanceRequest{
+			_, err := sgxGrpcClient.StateDBSubBalance(ctx, &sgx.StateDBSubBalanceRequest{
 				HandlerId: handlerId,
 				Caller:    sender.Address().Bytes(),
-				Amount:    new(big.Int).Mul(msg.GasPrice, new(big.Int).SetUint64(msg.GasLimit)).Uint64(),
+				Amount:    new(big.Int).Mul(msg.GasPrice, new(big.Int).SetUint64(msg.GasLimit)).String(),
 			})
 			if err != nil {
 				// panic cosmos if sgx isn't available.
-				if k.IsSgxDownError(err) {
+				if isSgxDownError(err) {
 					panic("sgx rpc server is down")
 				}
 				return nil, err
@@ -345,13 +345,13 @@ func (k *Keeper) ApplyMessageWithConfig(
 
 			// Ethermint original code:
 			// stateDB.SetNonce(sender.Address(), stateDB.GetNonce(sender.Address())+1)
-			_, err = sgxGrpcClient.StateDBIncreaseNonce(ctx, &sgxtypes.StateDBIncreaseNonceRequest{
+			_, err = sgxGrpcClient.StateDBIncreaseNonce(ctx, &sgx.StateDBIncreaseNonceRequest{
 				HandlerId: handlerId,
 				Caller:    sender.Address().Bytes(),
 			})
 			if err != nil {
 				// panic cosmos if sgx isn't available.
-				if k.IsSgxDownError(err) {
+				if isSgxDownError(err) {
 					panic("sgx rpc server is down")
 				}
 				return nil, err
@@ -362,14 +362,14 @@ func (k *Keeper) ApplyMessageWithConfig(
 			if cfg.DebugTrace {
 				// Ethermint original code:
 				// stateDB.AddBalance(sender.Address(), new(big.Int).Mul(msg.GasPrice, new(big.Int).SetUint64(leftoverGas)))
-				_, err := sgxGrpcClient.StateDBAddBalance(ctx, &sgxtypes.StateDBAddBalanceRequest{
+				_, err := sgxGrpcClient.StateDBAddBalance(ctx, &sgx.StateDBAddBalanceRequest{
 					HandlerId: handlerId,
 					Caller:    sender.Address().Bytes(),
-					Amount:    new(big.Int).Mul(msg.GasPrice, new(big.Int).SetUint64(leftoverGas)).Uint64(),
+					Amount:    new(big.Int).Mul(msg.GasPrice, new(big.Int).SetUint64(leftoverGas)).String(),
 				})
 				if err != nil {
 					// panic cosmos if sgx isn't available.
-					if k.IsSgxDownError(err) {
+					if isSgxDownError(err) {
 						panic("sgx rpc server is down")
 					}
 
@@ -410,17 +410,17 @@ func (k *Keeper) ApplyMessageWithConfig(
 
 	// Ethermint original code:
 	// stateDB.Prepare(rules, msg.From, cfg.CoinBase, msg.To, vm.ActivePrecompiles(rules), msg.AccessList)
-	sgxRules, err := json.Marshal(rules)
+	rulesJSON, err := json.Marshal(rules)
 	if err != nil {
 		return nil, errorsmod.Wrap(err, "rule marshall failure")
 	}
-	dbPrepareReq := &sgxtypes.StateDBPrepareRequest{
+	dbPrepareReq := &sgx.StateDBPrepareRequest{
 		HandlerId:  handlerId,
 		Sender:     msg.From.Bytes(),
 		Coinbase:   cfg.CoinBase.Bytes(),
-		Dest:       k.SafeAddress2Bytes(msg.To),
-		Rules:      sgxRules,
-		AccessList: make([]*sgxtypes.AccessTuple, 0),
+		Dest:       safeAddress2Bytes(msg.To),
+		RulesJson:  rulesJSON,
+		AccessList: make([]*sgx.AccessTuple, 0),
 	}
 
 	for _, accList := range msg.AccessList {
@@ -431,7 +431,7 @@ func (k *Keeper) ApplyMessageWithConfig(
 			}
 		}
 
-		dbPrepareReq.AccessList = append(dbPrepareReq.AccessList, &sgxtypes.AccessTuple{
+		dbPrepareReq.AccessList = append(dbPrepareReq.AccessList, &sgx.AccessTuple{
 			Address:     accList.Address.Bytes(),
 			StorageKeys: storageKeys,
 		})
@@ -440,7 +440,7 @@ func (k *Keeper) ApplyMessageWithConfig(
 	_, err = sgxGrpcClient.StateDBPrepare(ctx, dbPrepareReq)
 	if err != nil {
 		// panic cosmos if sgx isn't available.
-		if k.IsSgxDownError(err) {
+		if isSgxDownError(err) {
 			panic("sgx rpc server is down")
 		}
 
@@ -454,14 +454,14 @@ func (k *Keeper) ApplyMessageWithConfig(
 
 		// Ethermint original code:
 		// stateDB.SetNonce(sender.Address(), msg.Nonce)
-		_, err := sgxGrpcClient.StateDBSetNonce(ctx, &sgxtypes.StateDBSetNonceRequest{
+		_, err := sgxGrpcClient.StateDBSetNonce(ctx, &sgx.StateDBSetNonceRequest{
 			HandlerId: handlerId,
 			Caller:    msg.From.Bytes(),
 			Nonce:     msg.Nonce,
 		})
 		if err != nil {
 			// panic cosmos if sgx isn't available.
-			if k.IsSgxDownError(err) {
+			if isSgxDownError(err) {
 				panic("sgx rpc server is down")
 			}
 
@@ -470,7 +470,8 @@ func (k *Keeper) ApplyMessageWithConfig(
 
 		// Ethermint original code:
 		// ret, _, leftoverGas, vmErr = evm.Create(sender, msg.Data, leftoverGas, msg.Value)
-		resp, vmErr := sgxGrpcClient.Create(ctx, &sgxtypes.CreateRequest{
+		var resp *sgx.CreateResponse
+		resp, vmErr = sgxGrpcClient.Create(ctx, &sgx.CreateRequest{
 			HandlerId: handlerId,
 			Caller:    msg.From.Bytes(),
 			Code:      msg.Data,
@@ -479,52 +480,51 @@ func (k *Keeper) ApplyMessageWithConfig(
 		})
 		if vmErr != nil {
 			// panic cosmos if sgx isn't available.
-			if k.IsSgxDownError(vmErr) {
+			if isSgxDownError(vmErr) {
 				panic("sgx rpc server is down")
 			}
-
-			return nil, vmErr
+		} else {
+			ret = resp.Ret
+			leftoverGas = resp.LeftOverGas
 		}
-
-		ret = resp.Ret
-		leftoverGas = resp.LeftOverGas
 
 		// Ethermint original code:
 		// stateDB.SetNonce(sender.Address(), msg.Nonce+1)
-		_, vmErr = sgxGrpcClient.StateDBSetNonce(ctx, &sgxtypes.StateDBSetNonceRequest{
+		_, err = sgxGrpcClient.StateDBSetNonce(ctx, &sgx.StateDBSetNonceRequest{
 			HandlerId: handlerId,
 			Caller:    msg.From.Bytes(),
 			Nonce:     msg.Nonce + 1,
 		})
-		if vmErr != nil {
+		if err != nil {
 			// panic cosmos if sgx isn't available.
-			if k.IsSgxDownError(vmErr) {
+			if isSgxDownError(err) {
 				panic("sgx rpc server is down")
 			}
 
-			return nil, vmErr
+			return nil, err
 		}
 	} else {
 		// Ethermint original code:
 		// ret, leftoverGas, vmErr = evm.Call(sender, *msg.To, msg.Data, leftoverGas, msg.Value)
-		resp, vmErr := sgxGrpcClient.Call(ctx, &sgxtypes.CallRequest{
+		var resp *sgx.CallResponse
+		resp, vmErr = sgxGrpcClient.Call(ctx, &sgx.CallRequest{
 			HandlerId: handlerId,
 			Caller:    msg.From.Bytes(),
-			Addr:      k.SafeAddress2Bytes(msg.To),
+			Addr:      safeAddress2Bytes(msg.To),
 			Input:     msg.Data,
 			Gas:       leftoverGas,
 			Value:     msg.Value.Uint64(),
 		})
 		if vmErr != nil {
 			// panic cosmos if sgx isn't available.
-			if k.IsSgxDownError(vmErr) {
+			if isSgxDownError(vmErr) {
 				panic("sgx rpc server is down")
 			}
-
-			return nil, vmErr
+		} else {
+			ret = resp.Ret
+			leftoverGas = resp.LeftOverGas
 		}
-		ret = resp.Ret
-		leftoverGas = resp.LeftOverGas
+
 	}
 
 	refundQuotient := params.RefundQuotient
@@ -544,12 +544,12 @@ func (k *Keeper) ApplyMessageWithConfig(
 
 	// Ethermint original code:
 	// leftoverGas += GasToRefund(stateDB.GetRefund(), temporaryGasUsed, refundQuotient)
-	resp, err := sgxGrpcClient.StateDBGetRefund(ctx, &sgxtypes.StateDBGetRefundRequest{
+	resp, err := sgxGrpcClient.StateDBGetRefund(ctx, &sgx.StateDBGetRefundRequest{
 		HandlerId: handlerId,
 	})
 	if err != nil {
 		// panic cosmos if sgx isn't available.
-		if k.IsSgxDownError(err) {
+		if isSgxDownError(err) {
 			panic("sgx rpc server is down")
 		}
 
@@ -571,10 +571,10 @@ func (k *Keeper) ApplyMessageWithConfig(
 		// if err := stateDB.Commit(); err != nil {
 		// 		return nil, errorsmod.Wrap(err, "failed to commit stateDB")
 		// }
-		_, err := sgxGrpcClient.Commit(ctx, &sgxtypes.CommitRequest{HandlerId: handlerId})
+		_, err := sgxGrpcClient.Commit(ctx, &sgx.CommitRequest{HandlerId: handlerId})
 		if err != nil {
 			// panic cosmos if sgx isn't available.
-			if k.IsSgxDownError(err) {
+			if isSgxDownError(err) {
 				panic("sgx rpc server is down")
 			}
 			return nil, errorsmod.Wrap(err, "failed to commit sgx stateDB")
@@ -602,48 +602,29 @@ func (k *Keeper) ApplyMessageWithConfig(
 
 	// Ethermint original code:
 	// Logs: types.NewLogsFromEth(stateDB.Logs()),
-	respLogs, err := sgxGrpcClient.StateDBGetLogs(ctx, &sgxtypes.StateDBGetLogsRequest{HandlerId: handlerId})
+	logsResp, err := sgxGrpcClient.StateDBGetLogs(ctx, &sgx.StateDBGetLogsRequest{HandlerId: handlerId})
 	if err != nil {
 		// panic cosmos if sgx isn't available.
-		if k.IsSgxDownError(err) {
+		if isSgxDownError(err) {
 			panic("sgx rpc server is down")
 		}
 		return nil, err
 	}
 
-	ethlogs := make([]*ethtypes.Log, 0)
-	for _, log := range respLogs.Log {
-		ethLog := &ethtypes.Log{
-			Address: common.BytesToAddress(log.Address),
-			// list of topics provided by the contract.
-			// supplied by the contract, usually ABI-encoded
-			Data: log.Data,
-
-			// Derived fields. These fields are filled in by the node
-			// but not secured by consensus.
-			// block in which the transaction was included
-			BlockNumber: log.BlockNumber,
-			// hash of the transaction
-			TxHash: common.BytesToHash(log.TxHash),
-			// index of the transaction in the block
-			TxIndex: uint(log.TxIndex),
-			// hash of the block in which the transaction was included
-			BlockHash: common.BytesToHash(log.BlockHash),
-			// index of the log in the block
-			Index: uint(log.Index),
-
-			// The Removed field is true if this log was reverted due to a chain reorganisation.
-			// You must pay attention to this field if you receive logs through a filter query.
-			Removed: log.Removed,
+	ethlogs := make([]*ethtypes.Log, len(logsResp.Logs))
+	for i, log := range logsResp.Logs {
+		var l ethtypes.Log
+		err := json.Unmarshal(log, &l)
+		if err != nil {
+			return nil, errorsmod.Wrap(err, "failed to unmarshal log")
 		}
 
-		topics := make([]common.Hash, 0)
-		for _, topic := range log.Topics {
-			topics = append(topics, common.BytesToHash(topic))
-		}
+		ethlogs[i] = &l
+	}
 
-		ethLog.Topics = topics
-		ethlogs = append(ethlogs, ethLog)
+	err = k.stopEVM(ctx, handlerId, sgxGrpcClient)
+	if err != nil {
+		return nil, err
 	}
 
 	return &types.MsgEthereumTxResponse{
@@ -656,51 +637,30 @@ func (k *Keeper) ApplyMessageWithConfig(
 	}, nil
 }
 
-func (k *Keeper) SafeBigInt2Uint64Convert(val *big.Int) uint64 {
-	if val == nil {
-		return 0
-	}
-	return val.Uint64()
-}
-
-func (k *Keeper) SafeAddress2Bytes(addr *common.Address) []byte {
-	if addr == nil {
-		return nil
-	}
-	return addr.Bytes()
-}
-
-// prepareTxForSgx prepares the transaction for the SGX enclave. It:
-//   - creates an RPC server around the keeper to receive requests sent by the
-//     SGX
-//   - sends a "PrepareTx" request to the SGX enclave with the relevant tx and
-//     block info
-func (k *Keeper) prepareTxForSgx(ctx sdk.Context, msg core.Message, cfg *EVMConfig, sgxGrpcClient sgxtypes.QueryServiceClient) (uint64, error) {
-	// Step 1. Send a "PrepareTx" request to the SGX enclave.
-	chainConfig, err := json.Marshal(cfg.ChainConfig)
+// startEVM notifies the TEE enclave to create a new EVM. It returns the
+// unique handler id for the EVM.
+func (k *Keeper) startEVM(ctx sdk.Context, msg core.Message, cfg *EVMConfig, sgxGrpcClient sgx.QueryServiceClient) (uint64, error) {
+	// Step 1. Send a "StartEVM" request to the SGX enclave.
+	chainConfigJSON, err := json.Marshal(cfg.ChainConfig)
 	if err != nil {
 		return 0, err
 	}
 
-	var overrides []byte
+	var overridesJSON []byte
 	if cfg.Overrides != nil {
-		overrides, err = json.Marshal(cfg.Overrides)
+		overridesJSON, err = json.Marshal(cfg.Overrides)
 		if err != nil {
 			return 0, err
 		}
 	}
 
-	// Prepare EvmConfig
-	evmConfig := sgxtypes.PrepareTxEVMConfig{
-		ChainConfigJson: chainConfig,
-		CoinBase:        cfg.CoinBase.Bytes(),
-		BaseFee:         k.SafeBigInt2Uint64Convert(cfg.BaseFee),
-		DebugTrace:      cfg.DebugTrace,
-		NoBaseFee:       cfg.FeeMarketParams.NoBaseFee,
-		EvmDenom:        cfg.Params.EvmDenom,
-		Overrides:       overrides,
+	msgJSON, err := json.Marshal(msg)
+	if err != nil {
+		return 0, err
 	}
-	txConfig := sgxtypes.TxConfig{
+
+	// Prepare EvmConfig
+	txConfig := &sgx.TxConfig{
 		// Original type:  common.Hash
 		BlockHash: cfg.TxConfig.BlockHash.Bytes(),
 		// Original type: common.Hash
@@ -708,33 +668,63 @@ func (k *Keeper) prepareTxForSgx(ctx sdk.Context, msg core.Message, cfg *EVMConf
 		TxIndex:  uint64(cfg.TxConfig.TxIndex),
 		LogIndex: uint64(cfg.TxConfig.LogIndex),
 	}
-
-	evmConfig.TxConfig = txConfig
-
-	sgxMsg, err := json.Marshal(msg)
-	if err != nil {
-		return 0, err
+	evmConfig := sgx.StartEVMConfig{
+		ChainConfigJson: chainConfigJSON,
+		CoinBase:        cfg.CoinBase.Bytes(),
+		DebugTrace:      cfg.DebugTrace,
+		NoBaseFee:       cfg.FeeMarketParams.NoBaseFee,
+		TxConfig:        txConfig,
+		EvmDenom:        cfg.Params.EvmDenom,
+		ExtraEips:       cfg.Params.ExtraEIPs,
+		OverridesJson:   overridesJSON,
+	}
+	if cfg.BaseFee != nil {
+		evmConfig.BaseFee = cfg.BaseFee.String()
 	}
 
-	resp, err := sgxGrpcClient.PrepareTx(ctx, &sgxtypes.PrepareTxRequest{TxHash: cfg.TxConfig.TxHash.Bytes(), Header: ctx.BlockHeader(), Msg: sgxMsg, EvmConfig: evmConfig})
+	header := ctx.BlockHeader()
+	resp, err := sgxGrpcClient.StartEVM(ctx, &sgx.StartEVMRequest{
+		Header:    &header,
+		MsgJson:   msgJSON,
+		EvmConfig: &evmConfig,
+	})
 	if err != nil {
 		// panic cosmos if sgx isn't available.
-		if k.IsSgxDownError(err) {
+		if isSgxDownError(err) {
 			panic("sgx rpc server is down")
 		}
 
 		return 0, err
 	}
 
-	// Store handler id
-	handlerId := resp.HandlerId
-	// Snapshot the ctx
-	k.sdkCtxs[handlerId] = &ctx
+	// Snapshot the sdk ctx with this handlerId
+	k.sdkCtxs[resp.HandlerId] = &ctx
 
-	return handlerId, err
+	return resp.HandlerId, err
 }
 
-// IsSgxDownError checks if the error is related with RPC server down
-func (k *Keeper) IsSgxDownError(err error) bool {
-	return strings.Contains(err.Error(), types.ErrRPCConnectionDown.Error())
+func (k *Keeper) stopEVM(ctx sdk.Context, handlerId uint64, sgxGrpcClient sgx.QueryServiceClient) error {
+	_, err := sgxGrpcClient.StopEVM(ctx, &sgx.StopEVMRequest{HandlerId: handlerId})
+	if err != nil {
+		// panic cosmos if sgx isn't available.
+		if isSgxDownError(err) {
+			panic("sgx rpc server is down")
+		}
+	}
+
+	delete(k.sdkCtxs, handlerId)
+
+	return err
+}
+
+// isSgxDownError checks if the error is related with RPC server down
+func isSgxDownError(err error) bool {
+	return strings.Contains(err.Error(), types.ErrTeeConnDown.Error())
+}
+
+func safeAddress2Bytes(addr *common.Address) []byte {
+	if addr == nil {
+		return nil
+	}
+	return addr.Bytes()
 }
