@@ -9,6 +9,7 @@ option go_package = "github.com/evmos/ethermint/x/evm/sgx";
 // QueryService defines the gRPC querier service.
 service QueryService {
   rpc StartEVM(StartEVMRequest) returns (StartEVMResponse) {}
+  rpc InitFhevm(InitFhevmRequest) returns (InitFhevmResponse) {}
   rpc Create(CreateRequest) returns (CreateResponse) {}
   rpc Call(CallRequest) returns (CallResponse) {}
   rpc Commit(CommitRequest) returns (CommitResponse) {}
@@ -89,6 +90,13 @@ message StartEVMResponse {
   // handler_id is the unique request ID that is given by the SGX binary.
   uint64 handler_id = 1;
 }
+
+message InitFhevmRequest {
+  // handler_id is the unique request ID that is given by the SGX binary.
+  uint64 handler_id = 1;
+}
+
+message InitFhevmResponse {}
 
 message CreateRequest {
   // handler_id is the unique request ID that is given by the SGX binary.

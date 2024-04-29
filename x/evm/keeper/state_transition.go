@@ -640,7 +640,6 @@ func (k *Keeper) ApplyMessageWithConfig(
 // startEVM notifies the TEE enclave to create a new EVM. It returns the
 // unique handler id for the EVM.
 func (k *Keeper) startEVM(ctx sdk.Context, msg core.Message, cfg *EVMConfig, sgxGrpcClient sgx.QueryServiceClient) (uint64, error) {
-	// Step 1. Send a "StartEVM" request to the SGX enclave.
 	chainConfigJSON, err := json.Marshal(cfg.ChainConfig)
 	if err != nil {
 		return 0, err
@@ -696,9 +695,27 @@ func (k *Keeper) startEVM(ctx sdk.Context, msg core.Message, cfg *EVMConfig, sgx
 
 		return 0, err
 	}
-
 	// Snapshot the sdk ctx with this handlerId
 	k.sdkCtxs[resp.HandlerId] = &ctx
+
+	// We unfortunately can't call InitFhevm on the EVM instance during the
+	// StartEVM method (inside newEVM), because InitFhevm needs access to the
+	// stateDB (via a gRPC calls), but the stateDB (i.e. its associated
+	// sdk.Context) is not yet initialized at that point.
+	//
+	// To solve this, we separate the fhEVM initialization in two phases:
+	// 1. StartEVM: Initialize the EVM instance and store it in the evms map
+	// (doesn't need access to stateDB).
+	// 2. InitFhevm: Initialize the fhEVM instance (needs access to stateDB).
+	// ref: https://github.com/Inco-fhevm/zbc-go-ethereum/pull/2
+	//
+	// We are doing step 2 here.
+	_, err = sgxGrpcClient.InitFhevm(ctx, &sgx.InitFhevmRequest{
+		HandlerId: resp.HandlerId,
+	})
+	if err != nil {
+		return 0, err
+	}
 
 	return resp.HandlerId, err
 }
