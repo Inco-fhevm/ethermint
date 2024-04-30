@@ -18,6 +18,8 @@ export HOME_DIR=$(eval echo "${HOME_DIR:-"~/.ethermintd"}")
 export BINARY=${BINARY:-"./build/ethermintd"}
 export DENOM=${DENOM:-ainco}
 
+export FHEVM_GO_KEYS_DIR="$HOME_DIR/keys/network-fhe-keys"
+
 # if which binary does not exist, exit
 if [ -z `which $BINARY` ]; then
   echo "Ensure $BINARY is installed and in your PATH"
@@ -48,7 +50,8 @@ AMOUNT="1000000000000000000$DENOM" # 10**18, so 1INCO
 # The `$BINARY debug addr` outputs 4 lines, the 3rd one is:
 # Bech32 Acc: inco1n7g8ek2znyua9dqua554pjvkh8vysxejlsfmcp
 # We extract the inco1... part
-BECH32_ADDR=$($BINARY debug addr $RECIPIENT | sed -n '3 p' | sed 's/Bech32 Acc: //')
+echo "BECH32_ADDR $($BINARY debug addr $RECIPIENT)"
+BECH32_ADDR=$($BINARY debug addr $RECIPIENT | sed -n '5 p' | sed 's/Bech32 Acc: //')
 echo "Sending $AMOUNT to $BECH32_ADDR"
 
 $BINARY tx bank send $KEY $BECH32_ADDR $AMOUNT --gas-prices 1000000000$DENOM --yes

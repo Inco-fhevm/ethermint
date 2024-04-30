@@ -28,6 +28,7 @@ export GRPC_WEB=${GRPC_WEB:-"9091"}
 export ROSETTA=${ROSETTA:-"8080"}
 export BLOCK_TIME=${BLOCK_TIME:-"5s"}
 
+
 # if which binary does not exist, exit
 if [ -z `which $BINARY` ]; then
   echo "Ensure $BINARY is installed and in your PATH"
@@ -53,6 +54,12 @@ from_scratch () {
       return
   fi
   rm -rf $HOME_DIR && echo "Removed $HOME_DIR"
+
+  mkdir -p $HOME_DIR/config
+  cp ./scripts/node_config.toml $HOME_DIR/config
+
+  mkdir -p $HOME_DIR/keys/network-fhe-keys
+  fhevm-tfhe-cli generate-keys -d $HOME_DIR/keys/network-fhe-keys
 
   # reset values if not set already after whipe
   set_config
