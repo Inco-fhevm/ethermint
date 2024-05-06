@@ -2,6 +2,7 @@ syntax = "proto3";
 package ethermint.evm.v1;
 
 import "cosmos/base/query/v1beta1/pagination.proto";
+import "cosmos/base/v1beta1/coin.proto";
 import "ethermint/evm/v1/tx.proto";
 import "ethermint/evm/v1/log.proto";
 import "ethermint/evm/v1/params.proto";
@@ -81,6 +82,23 @@ service Query {
   rpc BaseFee(QueryBaseFeeRequest) returns (QueryBaseFeeResponse) {
     option (google.api.http).get = "/ethermint/evm/v1/base_fee";
   }
+
+  // StateDB
+  // TODO Move to a separate service
+  // ref: https://github.com/Inco-fhevm/inco-monorepo/issues/26
+
+  rpc StateDBGetHash(GetHashRequest) returns (GetHashResponse) {}
+  rpc StateDBAddBalance(AddBalanceRequest) returns (AddBalanceResponse) {}
+  rpc StateDBSubBalance(SubBalanceRequest) returns (SubBalanceResponse) {}
+  rpc StateDBSetBalance(SetBalanceRequest) returns (SetBalanceResponse) {}
+  rpc StateDBGetBalance(GetBalanceRequest) returns (GetBalanceResponse) {}
+  rpc StateDBGetAccount(GetAccountRequest) returns (GetAccountResponse) {}
+  rpc StateDBGetState(GetStateRequest) returns (GetStateResponse) {}
+  rpc StateDBGetCode(GetCodeRequest) returns (GetCodeResponse) {}
+  rpc StateDBSetAccount(SetAccountRequest) returns (SetAccountResponse) {}
+  rpc StateDBSetState(SetStateRequest) returns (SetStateResponse) {}
+  rpc StateDBSetCode(SetCodeRequest) returns (SetCodeResponse) {}
+  rpc StateDBDeleteAccount(DeleteAccountRequest) returns (DeleteAccountResponse) {}
 }
 
 // QueryAccountRequest is the request type for the Query/Account RPC method.
@@ -336,3 +354,157 @@ message QueryBaseFeeResponse {
   // base_fee is the EIP1559 base fee
   string base_fee = 1 [(gogoproto.customtype) = "cosmossdk.io/math.Int"];
 }
+
+message GetHashRequest {
+  // handler_id is the unique identifier of the request.
+  uint64 handler_id = 1;
+  uint64 height = 2;
+}
+
+message GetHashResponse {
+  // Original type: hash *common.Hash
+  bytes hash = 1;
+}
+
+message AddBalanceRequest {
+  // handler_id is the unique identifier of the request.
+  uint64 handler_id = 1;
+  // Original type: sdk.AccAddress
+  bytes address = 2;
+  // Original type: sdk.Coins
+  repeated cosmos.base.v1beta1.Coin amount = 3
+      [(gogoproto.nullable) = false, (gogoproto.castrepeated) = "github.com/cosmos/cosmos-sdk/types.Coins"];
+}
+
+message AddBalanceResponse {}
+
+message SubBalanceRequest {
+  // handler_id is the unique identifier of the request.
+  uint64 handler_id = 1;
+  // Original type: sdk.AccAddress
+  bytes address = 2;
+  // Original type: sdk.Coins
+  repeated cosmos.base.v1beta1.Coin amount = 3
+      [(gogoproto.nullable) = false, (gogoproto.castrepeated) = "github.com/cosmos/cosmos-sdk/types.Coins"];
+}
+
+message SubBalanceResponse {}
+
+message SetBalanceRequest {
+  // handler_id is the unique identifier of the request.
+  uint64 handler_id = 1;
+  // Original type: common.Address
+  bytes address = 2;
+  // Original type: *big.Int
+  string amount = 3;
+  string denom = 4;
+}
+
+message SetBalanceResponse {}
+
+message GetBalanceRequest {
+  // handler_id is the unique identifier of the request.
+  uint64 handler_id = 1;
+  // Original type: sdk.AccAddress
+  bytes address = 2;
+  string denom = 3;
+}
+
+message GetBalanceResponse {
+  // Original type: Balance *big.Int
+  string balance = 1;
+}
+
+message GetAccountRequest {
+  // handler_id is the unique identifier of the request.
+  uint64 handler_id = 1;
+  // Original type: common.Address
+  bytes address = 2;
+}
+
+message GetAccountResponse {
+  // Original type: *statedb.Account
+  Account account = 1;
+}
+
+// Account is the Ethereum consensus representation of accounts.
+// These objects are stored in the storage of auth module.
+//
+// Original type: statedb.Account
+message Account {
+  uint64 nonce = 1;
+  bytes code_hash = 2;
+}
+
+message GetStateRequest {
+  // handler_id is the unique identifier of the request.
+  uint64 handler_id = 1;
+
+  // Original type: common.Address
+  bytes address = 2;
+  // Original type: common.Hash
+  bytes key = 3;
+}
+
+message GetStateResponse {
+  // Original type: common.Hash
+  bytes hash = 1;
+}
+
+message GetCodeRequest {
+  // handler_id is the unique identifier of the request.
+  uint64 handler_id = 1;
+
+  // Original type: common.Hash
+  bytes code_hash = 2;
+}
+
+message GetCodeResponse {
+  // Code []byte
+  bytes code = 1;
+}
+
+message SetAccountRequest {
+  // handler_id is the unique identifier of the request.
+  uint64 handler_id = 1;
+
+  // Original type: common.Address
+  bytes address = 2;
+  // Original type: statedb.Account
+  Account account = 3;
+}
+
+message SetAccountResponse {}
+
+message SetStateRequest {
+  // handler_id is the unique identifier of the request.
+  uint64 handler_id = 1;
+  // Original type: common.Address
+  bytes address = 2;
+  // Original type: common.Hash
+  bytes key = 3;
+  // Original type: []byte
+  bytes value = 4;
+}
+
+message SetStateResponse {}
+
+message SetCodeRequest {
+  // handler_id is the unique identifier of the request.
+  uint64 handler_id = 1;
+  // Original type: []byte
+  bytes code_hash = 2;
+  // Original type: []byte
+  bytes code = 3;
+}
+
+message SetCodeResponse {}
+
+message DeleteAccountRequest {
+  // handler_id is the unique identifier of the request.
+  uint64 handler_id = 1;
+  // Original type: common.Address
+  bytes address = 2;
+}
+
+message DeleteAccountResponse {}

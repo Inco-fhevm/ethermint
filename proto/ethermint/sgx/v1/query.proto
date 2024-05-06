@@ -1,0 +1,253 @@
+syntax = "proto3";
+
+package ethermint.sgx.v1;
+
+import "tendermint/types/types.proto";
+
+option go_package = "github.com/evmos/ethermint/x/evm/sgx";
+
+// QueryService defines the gRPC querier service.
+service QueryService {
+  rpc StartEVM(StartEVMRequest) returns (StartEVMResponse) {}
+  rpc InitFhevm(InitFhevmRequest) returns (InitFhevmResponse) {}
+  rpc Create(CreateRequest) returns (CreateResponse) {}
+  rpc Call(CallRequest) returns (CallResponse) {}
+  rpc Commit(CommitRequest) returns (CommitResponse) {}
+  rpc StateDBAddBalance(StateDBAddBalanceRequest) returns (StateDBAddBalanceResponse) {}
+  rpc StateDBSubBalance(StateDBSubBalanceRequest) returns (StateDBSubBalanceResponse) {}
+  rpc StateDBSetNonce(StateDBSetNonceRequest) returns (StateDBSetNonceResponse) {}
+  rpc StateDBIncreaseNonce(StateDBIncreaseNonceRequest) returns (StateDBIncreaseNonceResponse) {}
+  rpc StateDBPrepare(StateDBPrepareRequest) returns (StateDBPrepareResponse) {}
+  rpc StateDBGetRefund(StateDBGetRefundRequest) returns (StateDBGetRefundResponse) {}
+  rpc StateDBGetLogs(StateDBGetLogsRequest) returns (StateDBGetLogsResponse) {}
+  rpc StopEVM(StopEVMRequest) returns (StopEVMResponse) {}
+}
+
+message StartEVMRequest {
+  // header is the Tendermint header of the block in which the transaction
+  // will be executed.
+  tendermint.types.Header header = 2;  // Header cmtproto.Header
+  // msg is the EVM transaction message to run on the EVM.
+  // Because of nil pointers in Golang, we chose to use JSON bytes here instead
+  // of a separate Protobuf message.
+  //
+  // Original geth type: core.Message
+  bytes msg_json = 3;
+  // EvmConfig is the EVM configuration to set.
+  StartEVMConfig evm_config = 4;  // EvmConfig StartEVMConfig
+}
+
+// StartEVMConfig is the EVM config that is passed to the SGX during the
+// StartEVM request.
+message StartEVMConfig {
+  // ChainConfig is the EVM chain configuration in JSON format. Since the
+  // underlying params.ChainConfig struct contains pointer fields, they are
+  // not serializable over RPC with gob. Instead, the JSON representation is
+  // used.
+  //
+  // Original type: params.ChainConfig
+  bytes chain_config_json = 1;
+  // Original type: common.Address
+  bytes coin_base = 2;
+  // Original type: *big.Int
+  string base_fee = 3;
+  // Original type: statedb.TxConfig
+  TxConfig tx_config = 4;
+  // Original type: bool
+  bool debug_trace = 5;
+  // Fields from EVMConfig.FeeMarketParams struct
+  // Original type: bool
+  bool no_base_fee = 6;
+  // Fields from EVMConfig.Params struct
+  // Original type: string
+  string evm_denom = 7;
+  // Original type: []int64
+  repeated int64 extra_eips = 8;
+  // overrides_json is the collection of overridden accounts. We chose to use
+  // JSON bytes instead of a separate Protobuf message because of nil pointers
+  // and the complexity of the original geth type.
+  //
+  // Original geth type: *rpctypes.StateOverride
+  bytes overrides_json = 9;
+}
+
+// TxConfig encapulates the readonly information of current tx for `StateDB`.
+message TxConfig {
+  // Original type:  common.Hash
+  bytes block_hash = 1;  // hash of current block
+  // tx_hash is the hash of current tx.
+  // Original type: common.Hash
+  bytes tx_hash = 2;
+  // tx_index is the index of current transaction
+  // Original type: int64
+  uint64 tx_index = 3;
+  // log_index is the index of next log within current block
+  // Original type: int64
+  uint64 log_index = 4;
+}
+
+message StartEVMResponse {
+  // handler_id is the unique request ID that is given by the SGX binary.
+  uint64 handler_id = 1;
+}
+
+message InitFhevmRequest {
+  // handler_id is the unique request ID that is given by the SGX binary.
+  uint64 handler_id = 1;
+}
+
+message InitFhevmResponse {}
+
+message CreateRequest {
+  // handler_id is the unique request ID that is given by the SGX binary.
+  uint64 handler_id = 1;
+  // caller is the account that creates the contract.
+  // Original data type: common.Address
+  bytes caller = 2;
+  bytes code = 3;
+  uint64 gas = 4;
+  // value is the amount of wei to send with the contract creation.
+  uint64 value = 5;
+}
+
+message CreateResponse {
+  // ret returns the result bytes of the contract creation.
+  bytes ret = 1;
+  // Original data type: common.Address
+  bytes contract_addr = 2;
+  uint64 left_over_gas = 3;
+}
+
+message CallRequest {
+  // handler_id is the unique request ID that is given by the SGX binary.
+  uint64 handler_id = 1;
+  // Original data type: vm.AccountRef
+  bytes caller = 2;
+  // Original data type: common.Address
+  bytes addr = 3;
+  // Original data type: []byte
+  bytes input = 4;
+  uint64 gas = 5;
+  // Original data type: *big.Int
+  uint64 value = 6;
+}
+
+message CallResponse {
+  // ret returns the result bytes of the contract call.
+  bytes ret = 1;
+  uint64 left_over_gas = 2;
+}
+
+message CommitRequest {
+  // handler_id is the unique request ID that is given by the SGX binary.
+  uint64 handler_id = 1;
+}
+
+message CommitResponse {}
+
+message StateDBAddBalanceRequest {
+  // handler_id is the unique request ID that is given by the SGX binary.
+  uint64 handler_id = 1;
+  // caller is the account to add balance too.
+  bytes caller = 2;
+  // amount is the amount to add, as a big.Int.
+  string amount = 3;
+}
+
+message StateDBAddBalanceResponse {}
+
+message StateDBSubBalanceRequest {
+  // handler_id is the unique request ID that is given by the SGX binary.
+  uint64 handler_id = 1;
+  // caller is the account to substract balance from.
+  bytes caller = 2;
+  // amount is the amount to substract, as a big.Int.
+  string amount = 3;
+}
+
+message StateDBSubBalanceResponse {}
+
+message StateDBSetNonceRequest {
+  // handler_id is the unique request ID that is given by the SGX binary.
+  uint64 handler_id = 1;
+  // Original data type: vm.AccountRef
+  bytes caller = 2;
+  uint64 nonce = 3;
+}
+
+message StateDBSetNonceResponse {}
+
+message StateDBIncreaseNonceRequest {
+  // handler_id is the unique request ID that is given by the SGX binary.
+  uint64 handler_id = 1;
+  // Original data type: vm.AccountRef
+  bytes caller = 2;
+}
+
+message StateDBIncreaseNonceResponse {}
+
+// AccessTuple is the element type of an access list.
+//
+// It is taken from geth:
+// https://github.com/ethereum/go-ethereum/blob/v1.13.5/core/types/tx_access_list.go#L33
+message AccessTuple {
+  // Original data type: common.Address
+  bytes address = 1;
+  // Original data type: []common.Hash
+  repeated bytes storage_keys = 2;
+}
+
+message StateDBPrepareRequest {
+  // handler_id is the unique request ID that is given by the SGX binary.
+  uint64 handler_id = 1;
+  // Original data type: common.Address
+  bytes sender = 2;
+  // Original data type: common.Address
+  bytes coinbase = 3;
+  // Original data type: common.Address
+  bytes dest = 4;
+  // rules_json represent the Rules that wrap ChainConfig and is merely
+  // syntactic sugar or can be used for functions that do not have or require
+  // information about the block.
+  //
+  // We chose to use JSON bytes instead of a separate Protobuf message because
+  // of nil pointers and the complexity of the original geth type.
+  //
+  // Original geth type: *params.Rules
+  bytes rules_json = 5;
+  // access_list is the list of storage keys that the transaction is allowed to
+  // access.
+  repeated AccessTuple access_list = 6;
+}
+
+message StateDBPrepareResponse {}
+
+message StateDBGetRefundRequest {
+  // handler_id is the unique request ID that is given by the SGX binary.
+  uint64 handler_id = 1;
+}
+
+message StateDBGetRefundResponse {
+  uint64 refund = 1;
+}
+
+message StateDBGetLogsRequest {
+  // handler_id is the unique request ID that is given by the SGX binary.
+  uint64 handler_id = 1;
+}
+
+message StateDBGetLogsResponse {
+  // logs are the logs of the execution. We chose to use
+  // JSON bytes instead of a separate Protobuf message because of nil pointers
+  // and the complexity of the original geth type.
+  //
+  // Original geth type: []*ethtypes.Log
+  repeated bytes logs = 1;
+}
+
+message StopEVMRequest {
+  // handler_id is the unique request ID that is given by the SGX binary.
+  uint64 handler_id = 1;
+}
+
+message StopEVMResponse {}
