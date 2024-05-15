@@ -17,10 +17,12 @@ package server
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net"
 	"net/http"
+	"net/rpc"
 	"os"
 	"path/filepath"
 	"runtime/pprof"
@@ -69,7 +71,15 @@ import (
 	"github.com/evmos/ethermint/server/config"
 	srvflags "github.com/evmos/ethermint/server/flags"
 	ethermint "github.com/evmos/ethermint/types"
+	evmKeeper "github.com/evmos/ethermint/x/evm/keeper"
 )
+
+// incoApp is a local interface to get the EVM keeper from the Inco chain app,
+// without introducing any circular dependencies.
+type incoApp interface {
+	// GetEvmKeeper returns evm keeper which is used in ethermint side to get evm keeper access
+	GetEvmKeeper() *evmKeeper.Keeper
+}
 
 // DBOpener is a function to open `application.db`, potentially with customized options.
 type DBOpener func(opts types.AppOptions, rootDir string, backend dbm.BackendType) (dbm.DB, error)
@@ -488,7 +498,64 @@ func startInProcess(svrCtx *server.Context, clientCtx client.Context, opts Start
 		return err
 	}
 
+	// Start running rpc server for sgx binary access on the evm Keeper statedb
+	listener, err := startRpcServer(svrCtx, g, app)
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		// TODO: Graceful stop
+		listener.Close()
+	}()
+
 	return g.Wait()
+}
+
+func startRpcServer(
+	svrCtx *server.Context,
+	g *errgroup.Group,
+	app types.Application,
+) (listener net.Listener, err error) {
+	ethApp := app.(incoApp)
+	evmKeeper := ethApp.GetEvmKeeper()
+	if evmKeeper == nil {
+		return nil, errors.New("evm keeper is invalid")
+	}
+
+	g.Go(func() error {
+		listener, err = runRPCServer(svrCtx, evmKeeper)
+		return err
+	})
+
+	return
+}
+
+func runRPCServer(svrCtx *server.Context, keeper *evmKeeper.Keeper) (net.Listener, error) {
+	defer func() {
+		if r := recover(); r != nil {
+			svrCtx.Logger.Error("recovered from panic", "error", r)
+		}
+	}()
+
+	// Run a persistent RPC server for sgx binary can access to evm keeper statedb
+	srv := &evmKeeper.EthmRpcServer{Keeper: keeper}
+	err := rpc.Register(srv)
+	if err != nil {
+		return nil, err
+	}
+
+	rpc.HandleHTTP()
+
+	// TODO handle port customization
+	l, err := net.Listen("tcp", ":9093")
+	if err != nil {
+		return nil, err
+	}
+
+	go http.Serve(l, nil)
+
+	return l, nil
 }
 
 func openDB(_ types.AppOptions, rootDir string, backendType dbm.BackendType) (dbm.DB, error) {

@@ -5,72 +5,121 @@ import (
 
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core"
 	"github.com/evmos/ethermint/x/evm/statedb"
 )
 
 // EthmRpcServer is a RPC server wrapper around the keeper. It is updated on
 // each new sdk.Message with the latest context and Ethereum core.Message.
 type EthmRpcServer struct {
-	ctx    sdk.Context
-	msg    core.Message
-	evmCfg *EVMConfig
-	k      *Keeper
+	Keeper *Keeper
 }
 
-func (s *EthmRpcServer) GetHash(height *uint64, hash *common.Hash) error {
-	*hash = s.k.GetHashFn(s.ctx)(*height)
+func (s *EthmRpcServer) GetHash(args *GetHashArgs, reply *GetHashReply) error {
+	ctx := s.Keeper.getSdkCtx(args.EvmId)
+	if ctx == nil {
+		panic("context is invalid")
+	}
+
+	reply.Hash = s.Keeper.GetHashFn(*ctx)(args.Height)
 	return nil
 }
 
 func (s *EthmRpcServer) AddBalance(args *AddBalanceArgs, reply *AddBalanceReply) error {
-	return s.k.AddBalance(s.ctx, args.Addr, args.Amount)
+	ctx := s.Keeper.getSdkCtx(args.EvmId)
+	if ctx == nil {
+		panic("context is invalid")
+	}
+
+	return s.Keeper.AddBalance(*ctx, args.Addr, args.Amount)
 }
 
 func (s *EthmRpcServer) SubBalance(args *SubBalanceArgs, reply *SubBalanceReply) error {
-	return s.k.SubBalance(s.ctx, args.Addr, args.Amount)
+	ctx := s.Keeper.getSdkCtx(args.EvmId)
+	if ctx == nil {
+		panic("context is invalid")
+	}
+
+	return s.Keeper.SubBalance(*ctx, args.Addr, args.Amount)
 }
 
 func (s *EthmRpcServer) GetBalance(args *GetBalanceArgs, reply *GetBalanceReply) error {
-	reply.Balance = s.k.GetBalance(s.ctx, args.Addr, args.Denom)
+	ctx := s.Keeper.getSdkCtx(args.EvmId)
+	if ctx == nil {
+		panic("context is invalid")
+	}
+
+	reply.Balance = s.Keeper.GetBalance(*ctx, args.Addr, args.Denom)
 	return nil
 }
 
 func (s *EthmRpcServer) GetAccount(args *GetAccountArgs, reply *GetAccountReply) error {
-	reply.Account = s.k.GetAccount(s.ctx, args.Addr)
+	ctx := s.Keeper.getSdkCtx(args.EvmId)
+	if ctx == nil {
+		panic("context is invalid")
+	}
+
+	reply.Account = s.Keeper.GetAccount(*ctx, args.Addr)
 	return nil
 }
 
 func (s *EthmRpcServer) GetState(args *GetStateArgs, reply *GetStateReply) error {
-	reply.Hash = s.k.GetState(s.ctx, args.Addr, args.Key)
+	ctx := s.Keeper.getSdkCtx(args.EvmId)
+	if ctx == nil {
+		panic("context is invalid")
+	}
+
+	reply.Hash = s.Keeper.GetState(*ctx, args.Addr, args.Key)
 	return nil
 }
 
 func (s *EthmRpcServer) GetCode(args *GetCodeArgs, reply *GetCodeReply) error {
-	reply.Code = s.k.GetCode(s.ctx, args.CodeHash)
+	ctx := s.Keeper.getSdkCtx(args.EvmId)
+	if ctx == nil {
+		panic("context is invalid")
+	}
+
+	reply.Code = s.Keeper.GetCode(*ctx, args.CodeHash)
 	return nil
 }
 
 func (s *EthmRpcServer) SetAccount(args *SetAccountArgs, reply *SetAccountReply) error {
-	return s.k.SetAccount(s.ctx, args.Addr, args.Account)
+	ctx := s.Keeper.getSdkCtx(args.EvmId)
+	if ctx == nil {
+		panic("context is invalid")
+	}
+
+	return s.Keeper.SetAccount(*ctx, args.Addr, args.Account)
 }
 
 func (s *EthmRpcServer) SetState(args *SetStateArgs, reply *SetStateReply) error {
-	s.k.SetState(s.ctx, args.Addr, args.Key, args.Value)
+	ctx := s.Keeper.getSdkCtx(args.EvmId)
+	if ctx == nil {
+		panic("context is invalid")
+	}
+	s.Keeper.SetState(*ctx, args.Addr, args.Key, args.Value)
 	return nil
 }
 
 func (s *EthmRpcServer) SetCode(args *SetCodeArgs, reply *SetCodeReply) error {
-	s.k.SetCode(s.ctx, args.CodeHash, args.Code)
+	ctx := s.Keeper.getSdkCtx(args.EvmId)
+	if ctx == nil {
+		panic("context is invalid")
+	}
+	s.Keeper.SetCode(*ctx, args.CodeHash, args.Code)
 	return nil
 }
 
 func (s *EthmRpcServer) DeleteAccount(args *DeleteAccountArgs, reply *DeleteAccountReply) error {
-	return s.k.DeleteAccount(s.ctx, args.Addr)
+	ctx := s.Keeper.getSdkCtx(args.EvmId)
+	if ctx == nil {
+		panic("context is invalid")
+	}
+	return s.Keeper.DeleteAccount(*ctx, args.Addr)
 }
 
 // AddBalanceArgs is the argument struct for the statedb.Keeper#AddBalance method.
 type AddBalanceArgs struct {
+	EvmId  uint64
 	Addr   sdk.AccAddress
 	Amount sdk.Coins
 }
@@ -81,6 +130,7 @@ type AddBalanceReply struct {
 
 // SubBalanceArgs is the argument struct for the statedb.Keeper#SubBalance method.
 type SubBalanceArgs struct {
+	EvmId  uint64
 	Addr   sdk.AccAddress
 	Amount sdk.Coins
 }
@@ -91,6 +141,7 @@ type SubBalanceReply struct {
 
 // GetBalanceArgs is the argument struct for the statedb.Keeper#GetBalance method.
 type GetBalanceArgs struct {
+	EvmId uint64
 	Addr  sdk.AccAddress
 	Denom string
 }
@@ -102,7 +153,8 @@ type GetBalanceReply struct {
 
 // GetAccountArgs is the argument struct for the statedb.Keeper#GetAccount method.
 type GetAccountArgs struct {
-	Addr common.Address
+	EvmId uint64
+	Addr  common.Address
 }
 
 // GetAccountReply is the reply struct for the statedb.Keeper#GetAccount method.
@@ -112,17 +164,20 @@ type GetAccountReply struct {
 
 // GetStateArgs is the argument struct for the statedb.Keeper#GetState method.
 type GetStateArgs struct {
-	Addr common.Address
-	Key  common.Hash
+	EvmId uint64
+	Addr  common.Address
+	Key   common.Hash
 }
 
 // GetStateReply is the reply struct for the statedb.Keeper#GetState method.
 type GetStateReply struct {
-	Hash common.Hash
+	EvmId uint64
+	Hash  common.Hash
 }
 
 // GetCodeArgs is the argument struct for the statedb.Keeper#GetCode method.
 type GetCodeArgs struct {
+	EvmId    uint64
 	CodeHash common.Hash
 }
 
@@ -133,6 +188,7 @@ type GetCodeReply struct {
 
 // SetAccountArgs is the argument struct for the statedb.Keeper#SetAccount method.
 type SetAccountArgs struct {
+	EvmId   uint64
 	Addr    common.Address
 	Account statedb.Account
 }
@@ -143,6 +199,7 @@ type SetAccountReply struct {
 
 // SetStateArgs is the argument struct for the statedb.Keeper#SetState method.
 type SetStateArgs struct {
+	EvmId uint64
 	Addr  common.Address
 	Key   common.Hash
 	Value []byte
@@ -154,6 +211,7 @@ type SetStateReply struct {
 
 // SetCodeArgs is the argument struct for the statedb.Keeper#SetCode method.
 type SetCodeArgs struct {
+	EvmId    uint64
 	CodeHash []byte
 	Code     []byte
 }
@@ -164,9 +222,21 @@ type SetCodeReply struct {
 
 // DeleteAccountArgs is the argument struct for the statedb.Keeper#DeleteAccount method.
 type DeleteAccountArgs struct {
-	Addr common.Address
+	EvmId uint64
+	Addr  common.Address
 }
 
 // DeleteAccountReply is the reply struct for the statedb.Keeper#DeleteAccount method.
 type DeleteAccountReply struct {
+}
+
+// GetHashArgs is the argument struct for the statedb.Keeper#GetHash method.
+type GetHashArgs struct {
+	EvmId  uint64
+	Height uint64
+}
+
+// GetHashReply is the reply struct for the statedb.Keeper#GetHash method.
+type GetHashReply struct {
+	Hash common.Hash
 }
