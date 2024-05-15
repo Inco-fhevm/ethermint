@@ -74,8 +74,10 @@ import (
 	evmKeeper "github.com/evmos/ethermint/x/evm/keeper"
 )
 
-type IncoApp interface {
-	// Return evm keeper which is used in ethermint side to get evm keeper access
+// incoApp is a local interface to get the EVM keeper from the Inco chain app,
+// without introducing any circular dependencies.
+type incoApp interface {
+	// GetEvmKeeper returns evm keeper which is used in ethermint side to get evm keeper access
 	GetEvmKeeper() *evmKeeper.Keeper
 }
 
@@ -515,7 +517,7 @@ func startRpcServer(
 	g *errgroup.Group,
 	app types.Application,
 ) (listener net.Listener, err error) {
-	ethApp := app.(IncoApp)
+	ethApp := app.(incoApp)
 	evmKeeper := ethApp.GetEvmKeeper()
 	if evmKeeper == nil {
 		return nil, errors.New("evm keeper is invalid")

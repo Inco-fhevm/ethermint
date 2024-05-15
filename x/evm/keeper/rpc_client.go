@@ -93,10 +93,10 @@ func (c *sgxRPCClient) StopEVM(args StopEVMArgs, reply *StopEVMReply) error {
 	return c.doCall("SgxRpcServer.StopEVM", args, reply)
 }
 
-// StartEVMTxEVMConfig only contains the fields from EVMConfig that are needed
+// StartEVMConfig only contains the fields from EVMConfig that are needed
 // to create a new EVM instance. This is used to pass the EVM configuration
 // over RPC to the SGX binary.
-type StartEVMTxEVMConfig struct {
+type StartEVMConfig struct {
 	// ChainConfig is the EVM chain configuration in JSON format. Since the
 	// underlying params.ChainConfig struct contains pointer fields, they are
 	// not serializable over RPC with gob. Instead, the JSON representation is
@@ -128,7 +128,7 @@ type StartEVMArgs struct {
 	// Msg is the EVM transaction message to run on the EVM.
 	Msg core.Message
 	// EvmConfig is the EVM configuration to set.
-	EvmConfig StartEVMTxEVMConfig
+	EvmConfig StartEVMConfig
 }
 
 // StartEVMReply is the reply struct for the SgxRpcServer.StartEVM RPC method.

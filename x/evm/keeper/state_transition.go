@@ -560,7 +560,7 @@ func (k *Keeper) startEVM(ctx sdk.Context, msg core.Message, cfg *EVMConfig, sgx
 	args := StartEVMArgs{
 		Header: ctx.BlockHeader(),
 		Msg:    msg,
-		EvmConfig: StartEVMTxEVMConfig{
+		EvmConfig: StartEVMConfig{
 			ChainConfigJson: ChainConfigJson,
 			CoinBase:        cfg.CoinBase,
 			BaseFee:         cfg.BaseFee,
