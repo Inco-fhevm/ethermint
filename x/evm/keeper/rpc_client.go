@@ -15,80 +15,88 @@ import (
 	"github.com/evmos/ethermint/x/evm/statedb"
 )
 
-type sgxRPCClient struct {
+type teeRPCClient struct {
 	logger log.Logger
 	cl     *rpc.Client
 }
 
-// newSgxRPCClient creates a new RPC client to communicate with the SGX binary.
-func newSgxRPCClient(logger log.Logger) (*sgxRPCClient, error) {
+// newTEERPCClient creates a new RPC client to communicate with the TEE binary.
+func newTEERPCClient(logger log.Logger) (*teeRPCClient, error) {
 	// TODO Make ports configurable
 	cl, err := rpc.DialHTTP("tcp", "localhost"+":9092")
 	if err != nil {
 		return nil, err
 	}
 
-	return &sgxRPCClient{
+	return &teeRPCClient{
 		logger: logger,
 		cl:     cl,
 	}, nil
 }
 
-func (c *sgxRPCClient) doCall(method string, args, reply any) error {
+func (c *teeRPCClient) doCall(method string, args, reply any) error {
 	c.logger.Debug(fmt.Sprintf("RPC call %s", method), "args", args)
 	err := c.cl.Call(method, args, reply)
 	c.logger.Debug(fmt.Sprintf("RPC call %s", method), "reply", reply)
 	return err
 }
 
-func (c *sgxRPCClient) PrepareTx(args PrepareTxArgs, reply *PrepareTxReply) error {
-	return c.doCall("SgxRpcServer.PrepareTx", args, reply)
+func (c *teeRPCClient) StartEVM(args StartEVMArgs, reply *StartEVMReply) error {
+	return c.doCall("TEERpcServer.StartEVM", args, reply)
 }
 
-func (c *sgxRPCClient) Call(args CallArgs, reply *CallReply) error {
-	return c.doCall("SgxRpcServer.Call", args, reply)
+func (c *teeRPCClient) InitFhevm(args InitFhevmArgs, reply *InitFhevmReply) error {
+	return c.doCall("TEERpcServer.InitFhevm", args, reply)
 }
 
-func (c *sgxRPCClient) Create(args CreateArgs, reply *CreateReply) error {
-	return c.doCall("SgxRpcServer.Create", args, reply)
+func (c *teeRPCClient) Call(args CallArgs, reply *CallReply) error {
+	return c.doCall("TEERpcServer.Call", args, reply)
 }
 
-func (c *sgxRPCClient) Commit(args CommitArgs, reply *CommitReply) error {
-	return c.doCall("SgxRpcServer.Commit", args, reply)
+func (c *teeRPCClient) Create(args CreateArgs, reply *CreateReply) error {
+	return c.doCall("TEERpcServer.Create", args, reply)
 }
 
-func (c *sgxRPCClient) StateDBAddBalance(args StateDBAddBalanceArgs, reply *StateDBAddBalanceReply) error {
-	return c.doCall("SgxRpcServer.StateDBAddBalance", args, reply)
+func (c *teeRPCClient) Commit(args CommitArgs, reply *CommitReply) error {
+	return c.doCall("TEERpcServer.Commit", args, reply)
 }
 
-func (c *sgxRPCClient) StateDBSubBalance(args StateDBSubBalanceArgs, reply *StateDBSubBalanceReply) error {
-	return c.doCall("SgxRpcServer.StateDBSubBalance", args, reply)
+func (c *teeRPCClient) StateDBAddBalance(args StateDBAddBalanceArgs, reply *StateDBAddBalanceReply) error {
+	return c.doCall("TEERpcServer.StateDBAddBalance", args, reply)
 }
 
-func (c *sgxRPCClient) StateDBSetNonce(args StateDBSetNonceArgs, reply *StateDBSetNonceReply) error {
-	return c.doCall("SgxRpcServer.StateDBSetNonce", args, reply)
+func (c *teeRPCClient) StateDBSubBalance(args StateDBSubBalanceArgs, reply *StateDBSubBalanceReply) error {
+	return c.doCall("TEERpcServer.StateDBSubBalance", args, reply)
 }
 
-func (c *sgxRPCClient) StateDBIncreaseNonce(args StateDBIncreaseNonceArgs, reply *StateDBIncreaseNonceReply) error {
-	return c.doCall("SgxRpcServer.StateDBIncreaseNonce", args, reply)
+func (c *teeRPCClient) StateDBSetNonce(args StateDBSetNonceArgs, reply *StateDBSetNonceReply) error {
+	return c.doCall("TEERpcServer.StateDBSetNonce", args, reply)
 }
 
-func (c *sgxRPCClient) StateDBPrepare(args StateDBPrepareArgs, reply *StateDBPrepareReply) error {
-	return c.doCall("SgxRpcServer.StateDBPrepare", args, reply)
+func (c *teeRPCClient) StateDBIncreaseNonce(args StateDBIncreaseNonceArgs, reply *StateDBIncreaseNonceReply) error {
+	return c.doCall("TEERpcServer.StateDBIncreaseNonce", args, reply)
 }
 
-func (c *sgxRPCClient) StateDBGetRefund(args StateDBGetRefundArgs, reply *StateDBGetRefundReply) error {
-	return c.doCall("SgxRpcServer.StateDBGetRefund", args, reply)
+func (c *teeRPCClient) StateDBPrepare(args StateDBPrepareArgs, reply *StateDBPrepareReply) error {
+	return c.doCall("TEERpcServer.StateDBPrepare", args, reply)
 }
 
-func (c *sgxRPCClient) StateDBGetLogs(args StateDBGetLogsArgs, reply *StateDBGetLogsReply) error {
-	return c.doCall("SgxRpcServer.StateDBGetLogs", args, reply)
+func (c *teeRPCClient) StateDBGetRefund(args StateDBGetRefundArgs, reply *StateDBGetRefundReply) error {
+	return c.doCall("TEERpcServer.StateDBGetRefund", args, reply)
 }
 
-// PrepareTxEVMConfig only contains the fields from EVMConfig that are needed
+func (c *teeRPCClient) StateDBGetLogs(args StateDBGetLogsArgs, reply *StateDBGetLogsReply) error {
+	return c.doCall("TEERpcServer.StateDBGetLogs", args, reply)
+}
+
+func (c *teeRPCClient) StopEVM(args StopEVMArgs, reply *StopEVMReply) error {
+	return c.doCall("TEERpcServer.StopEVM", args, reply)
+}
+
+// StartEVMTxEVMConfig only contains the fields from EVMConfig that are needed
 // to create a new EVM instance. This is used to pass the EVM configuration
-// over RPC to the SGX binary.
-type PrepareTxEVMConfig struct {
+// over RPC to the TEE binary.
+type StartEVMTxEVMConfig struct {
 	// ChainConfig is the EVM chain configuration in JSON format. Since the
 	// underlying params.ChainConfig struct contains pointer fields, they are
 	// not serializable over RPC with gob. Instead, the JSON representation is
@@ -111,8 +119,8 @@ type PrepareTxEVMConfig struct {
 	Overrides string
 }
 
-// PrepareTxArgs is the argument struct for the SgxRpcServer.PrepareTx RPC method.
-type PrepareTxArgs struct {
+// StartEVMArgs is the argument struct for the TEERpcServer.StartEVM RPC method.
+type StartEVMArgs struct {
 	TxHash []byte
 	// Header is the Tendermint header of the block in which the transaction
 	// will be executed.
@@ -120,15 +128,26 @@ type PrepareTxArgs struct {
 	// Msg is the EVM transaction message to run on the EVM.
 	Msg core.Message
 	// EvmConfig is the EVM configuration to set.
-	EvmConfig PrepareTxEVMConfig
+	EvmConfig StartEVMTxEVMConfig
 }
 
-// PrepareTxArgs is the reply struct for the SgxRpcServer.PrepareTx RPC method.
-type PrepareTxReply struct {
+// StartEVMReply is the reply struct for the TEERpcServer.StartEVM RPC method.
+type StartEVMReply struct {
+	EvmId uint64
 }
 
-// CallArgs is the argument struct for the SgxRpcServer.Call RPC method.
+// InitFhevmArgs is the arg struct for the TEERpcServer.InitFhevm RPC method.
+type InitFhevmArgs struct {
+	EvmId uint64
+}
+
+// InitFhevmReply is the reply struct for the TEERpcServer.InitFhevm RPC method.
+type InitFhevmReply struct {
+}
+
+// CallArgs is the argument struct for the TEERpcServer.Call RPC method.
 type CallArgs struct {
+	EvmId  uint64
 	Caller vm.AccountRef
 	Addr   common.Address
 	Input  []byte
@@ -136,86 +155,94 @@ type CallArgs struct {
 	Value  *big.Int
 }
 
-// CallReply is the reply struct for the SgxRpcServer.Call RPC method.
+// CallReply is the reply struct for the TEERpcServer.Call RPC method.
 type CallReply struct {
 	Ret         []byte
 	LeftOverGas uint64
 }
 
-// CreateArgs is the argument struct for the SgxRpcServer.Create RPC method.
+// CreateArgs is the argument struct for the TEERpcServer.Create RPC method.
 type CreateArgs struct {
+	EvmId  uint64
 	Caller vm.AccountRef
 	Code   []byte
 	Gas    uint64
 	Value  *big.Int
 }
 
-// CreateReply is the reply struct for the SgxRpcServer.Create RPC method.
+// CreateReply is the reply struct for the TEERpcServer.Create RPC method.
 type CreateReply struct {
 	Ret          []byte
 	ContractAddr common.Address
 	LeftOverGas  uint64
 }
 
-// CommitArgs is the argument struct for the SgxRpcServer.Commit RPC method.
+// CommitArgs is the argument struct for the TEERpcServer.Commit RPC method.
 type CommitArgs struct {
-	Commit bool
+	EvmId uint64
 }
 
-// CommitReply is the reply struct for the SgxRpcServer.Commit RPC method.
+// CommitReply is the reply struct for the TEERpcServer.Commit RPC method.
 type CommitReply struct {
 }
 
-// CommitArgs is the argument struct for the SgxRpcServer.StateDBSubBalance RPC method.
+// CommitArgs is the argument struct for the TEERpcServer.StateDBSubBalance RPC method.
 type StateDBSubBalanceArgs struct {
+	EvmId  uint64
 	Caller vm.AccountRef
 	Msg    core.Message
 }
 
-// CommitReply is the reply struct for the SgxRpcServer.StateDBSubBalance RPC method.
+// CommitReply is the reply struct for the TEERpcServer.StateDBSubBalance RPC method.
 type StateDBSubBalanceReply struct {
 }
 
-// CommitArgs is the argument struct for the SgxRpcServer.StateDSetNonce RPC method.
+// CommitArgs is the argument struct for the TEERpcServer.StateDSetNonce RPC method.
 type StateDBSetNonceArgs struct {
+	EvmId  uint64
 	Caller vm.AccountRef
 	Nonce  uint64
 }
 
-// CommitReply is the reply struct for the SgxRpcServer.StateDSetNonce RPC method.
+// CommitReply is the reply struct for the TEERpcServer.StateDSetNonce RPC method.
 type StateDBSetNonceReply struct {
 }
 
-// StateDBAddBalanceArgs is the argument struct for the SgxRpcServer.StateDBAddBalance RPC method.
+// StateDBAddBalanceArgs is the argument struct for the TEERpcServer.StateDBAddBalance RPC method.
 type StateDBAddBalanceArgs struct {
+	EvmId       uint64
 	Caller      vm.AccountRef
 	Msg         core.Message
 	LeftoverGas uint64
 }
 
-// StateDBAddBalanceReply is the reply struct for the SgxRpcServer.StateDBAddBalance RPC method.
+// StateDBAddBalanceReply is the reply struct for the TEERpcServer.StateDBAddBalance RPC method.
 type StateDBAddBalanceReply struct {
 }
 
 type StateDBPrepareArgs struct {
-	Msg   core.Message
-	Rules params.Rules
+	EvmId    uint64
+	Msg      core.Message
+	Rules    params.Rules
+	CoinBase common.Address
 }
 
 type StateDBPrepareReply struct {
 }
 
-// StateDBIncreaseNonceArgs is the argument struct for the SgxRpcServer.StateDBIncreaseNonce RPC method.
+// StateDBIncreaseNonceArgs is the argument struct for the TEERpcServer.StateDBIncreaseNonce RPC method.
 type StateDBIncreaseNonceArgs struct {
+	EvmId  uint64
 	Caller vm.AccountRef
 	Msg    core.Message
 }
 
-// StateDBIncreaseNonceReply is the reply struct for the SgxRpcServer.StateDBIncreaseNonce RPC method.
+// StateDBIncreaseNonceReply is the reply struct for the TEERpcServer.StateDBIncreaseNonce RPC method.
 type StateDBIncreaseNonceReply struct {
 }
 
 type StateDBGetRefundArgs struct {
+	EvmId uint64
 }
 
 type StateDBGetRefundReply struct {
@@ -223,8 +250,16 @@ type StateDBGetRefundReply struct {
 }
 
 type StateDBGetLogsArgs struct {
+	EvmId uint64
 }
 
 type StateDBGetLogsReply struct {
 	Logs []*ethtypes.Log
+}
+
+type StopEVMArgs struct {
+	EvmId uint64
+}
+
+type StopEVMReply struct {
 }
